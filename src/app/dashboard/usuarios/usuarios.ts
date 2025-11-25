@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectorRef, ViewChild, AfterViewInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef, ViewChild, AfterViewInit, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { UserService } from '../../services/user.service';
@@ -29,6 +29,9 @@ export class UsuariosComponent implements OnInit, AfterViewInit {
   editingUser: User | null = null;
   userForm: FormGroup;
   errorMessage = '';
+
+  changeDetection: ChangeDetectionStrategy.OnPush = ChangeDetectionStrategy.OnPush;
+  
 
   displayedColumns: string[] = ['username', 'email', 'rol', 'acciones'];
   dataSource = new MatTableDataSource<User>();

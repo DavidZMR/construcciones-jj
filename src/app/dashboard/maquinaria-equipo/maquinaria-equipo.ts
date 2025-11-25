@@ -1,8 +1,8 @@
-import { Component, OnInit, ChangeDetectorRef, ViewChild, AfterViewInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef, ViewChild, AfterViewInit, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { UserService } from '../../services/user.service';
-import { User } from '../../interfaces/api-response.interface';
+import { MaquinariaEquipoService } from '../../services/maquinaria-equipo.service';
+import { MaquinariaEquipo } from '../../interfaces/api-response.interface';
 import Swal from 'sweetalert2';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
@@ -20,30 +20,49 @@ import { MatSort, MatSortModule } from '@angular/material/sort';
   templateUrl: './maquinaria-equipo.html',
   styleUrl: './maquinaria-equipo.scss',
 })
-export class MaquinariaEquipo {
-  users: any[] = [];
+export class MaquinariaEquipoComponent implements OnInit, AfterViewInit {
+  items: MaquinariaEquipo[] = [];
   isLoading = false;
   showModal = false;
   isEditing = false;
-  editing: any | null = null;
+  editingItem: MaquinariaEquipo | null = null;
   form: FormGroup;
   errorMessage = '';
+  strType = ''
+  generalFilter = ''
+  strStatus = ''
 
-  displayedColumns: string[] = ['username', 'email', 'rol', 'acciones'];
-  dataSource = new MatTableDataSource<any>();
+  changeDetection: ChangeDetectionStrategy.OnPush = ChangeDetectionStrategy.OnPush;
+
+  displayedColumns: string[] = ['codigo', 'nombre', 'tipo', 'placa', 'estado', 'acciones'];
+  dataSource = new MatTableDataSource<MaquinariaEquipo>();
 
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
 
   constructor(
+    private maquinariaService: MaquinariaEquipoService,
     private fb: FormBuilder,
     private cdr: ChangeDetectorRef
   ) {
     this.form = this.fb.group({
-      username: ['', [Validators.required, Validators.minLength(3)]],
-      email: ['', [Validators.required, Validators.email]],
-      password: ['', [Validators.minLength(6)]],
-      rol: ['usuario', Validators.required]
+      codigo: ['', [Validators.required]],
+      nombre: ['', [Validators.required]],
+      tipo: ['Herramienta', Validators.required],
+      descripcion: [''],
+      placa: ['']
+    });
+
+    // Suscribirse a cambios en el tipo para validar placa
+    this.form.get('tipo')?.valueChanges.subscribe(value => {
+      const placaControl = this.form.get('placa');
+      if (value === 'Vehiculo') {
+        placaControl?.setValidators([Validators.required]);
+      } else {
+        placaControl?.clearValidators();
+        placaControl?.setValue('');
+      }
+      placaControl?.updateValueAndValidity();
     });
   }
 
@@ -54,61 +73,62 @@ export class MaquinariaEquipo {
   ngAfterViewInit() {
     this.dataSource.paginator = this.paginator;
     this.dataSource.sort = this.sort;
-  }
 
+    this.dataSource.filterPredicate = this.customFilterPredicate();
+  }
 
   loadData(): void {
-    // this.isLoading = true;
+    this.isLoading = true;
 
-    // this.userService.getUsers().subscribe({
-    //   next: (users) => {
-    //     this.users = users;
-    //     this.dataSource = new MatTableDataSource(users);
+    this.maquinariaService.getAll().subscribe({
+      next: (items) => {
+        this.items = items;
+        this.dataSource.data = items;
+        this.dataSource.filterPredicate = this.customFilterPredicate();
 
-    //     // reasignar paginator y sort DESPUÉS de crear el dataSource
-    //     setTimeout(() => {
-    //       this.dataSource.paginator = this.paginator;
-    //       this.dataSource.sort = this.sort;
-    //     });
+        setTimeout(() => {
+          this.dataSource.paginator = this.paginator;
+          this.dataSource.sort = this.sort;
+        });
 
-    //     this.isLoading = false;
-    //     this.cdr.detectChanges();
-    //   },
-    //   error: (error) => {
-    //     this.errorMessage = error.message || 'Error al cargar usuarios';
-    //     this.isLoading = false;
-    //   }
-    // });
+        this.isLoading = false;
+        this.cdr.detectChanges();
+      },
+      error: (error) => {
+        this.errorMessage = error.message || 'Error al cargar datos';
+        this.isLoading = false;
+        this.cdr.detectChanges();
+      }
+    });
   }
 
+  // ... (methods from openCreateModal to delete remain unchanged)
 
   openCreateModal(): void {
     this.isEditing = false;
-    this.editing = null;
+    this.editingItem = null;
     this.form.reset({
-      username: '',
-      email: '',
-      password: '',
-      rol: 'usuario'
+      codigo: '',
+      nombre: '',
+      tipo: 'Herramienta',
+      descripcion: '',
+      placa: ''
     });
-    this.form.get('password')?.setValidators([Validators.required, Validators.minLength(6)]);
-    this.form.get('password')?.updateValueAndValidity();
     this.showModal = true;
     this.errorMessage = '';
     this.cdr.detectChanges();
   }
 
-  openEditModal(user: any): void {
+  openEditModal(item: MaquinariaEquipo): void {
     this.isEditing = true;
-    this.editing = user;
+    this.editingItem = item;
     this.form.reset({
-      username: user.username,
-      email: user.email,
-      password: '',
-      rol: user.rol
+      codigo: item.codigo,
+      nombre: item.nombre,
+      tipo: item.tipo,
+      descripcion: item.descripcion,
+      placa: item.placa
     });
-    this.form.get('password')?.clearValidators();
-    this.form.get('password')?.updateValueAndValidity();
     this.showModal = true;
     this.errorMessage = '';
     this.cdr.detectChanges();
@@ -121,87 +141,128 @@ export class MaquinariaEquipo {
     this.cdr.detectChanges();
   }
 
-  saveUser(): void {
+  save(): void {
     if (this.form.valid) {
       this.isLoading = true;
       this.errorMessage = '';
 
-      const userData = this.form.value;
+      const formData = this.form.value;
 
       if (!this.isEditing) {
-        // Crear nuevo usuario
-        // this.userService.createUser(userData).subscribe({
-        //   next: () => {
-        //     this.loadData();
-        //     this.closeModal();
-        //     this.isLoading = false;
-        //     this.cdr.detectChanges();
-        //   },
-        //   error: (error) => {
-        //     this.isLoading = false;
-        //     this.errorMessage = error.message || 'Error al crear usuario';
-        //     this.cdr.detectChanges();
-        //   }
-        // });
+        this.maquinariaService.create(formData).subscribe({
+          next: () => {
+            this.loadData();
+            this.closeModal();
+            this.isLoading = false;
+            this.cdr.detectChanges();
+          },
+          error: (error) => {
+            this.isLoading = false;
+            this.errorMessage = error.message || 'Error al crear elemento';
+            this.cdr.detectChanges();
+          }
+        });
       } else {
-        // Actualizar usuario
-        const updateData: any = {
-          username: userData.username,
-          email: userData.email,
-          rol: userData.rol
-        };
-
-        if (userData.password) {
-          updateData.password = userData.password;
-        }
-
-        // this.userService.updateUser(this.editingUser!._id || this.editingUser!.id!, updateData).subscribe({
-        //   next: () => {
-        //     this.loadData();
-        //     this.closeModal();
-        //     this.isLoading = false;
-        //     this.cdr.detectChanges();
-        //   },
-        //   error: (error) => {
-        //     this.isLoading = false;
-        //     this.errorMessage = error.message || 'Error al actualizar usuario';
-        //     this.cdr.detectChanges();
-        //   }
-        // });
+        this.maquinariaService.update(this.editingItem!._id || this.editingItem!.id!, formData).subscribe({
+          next: () => {
+            this.loadData();
+            this.closeModal();
+            this.isLoading = false;
+            this.cdr.detectChanges();
+          },
+          error: (error) => {
+            this.isLoading = false;
+            this.errorMessage = error.message || 'Error al actualizar elemento';
+            this.cdr.detectChanges();
+          }
+        });
       }
     } else {
+      this.form.markAllAsTouched();
       this.errorMessage = 'Por favor, completa todos los campos correctamente.';
     }
   }
 
-  delete(user: any): void {
-    // Swal.fire({
-    //   title: 'Confirmar eliminación',
-    //   text: `¿Estás seguro de que deseas eliminar al usuario ${user.username}?`,
-    //   icon: 'warning',
-    //   showCancelButton: true,
-    //   confirmButtonText: 'Sí, eliminar',
-    //   cancelButtonText: 'Cancelar'
-    // }).then((result) => {
-    //   if (result.isConfirmed) {
-    //     this.isLoading = true;
-    //     this.userService.deleteUser(user._id || user.id!).subscribe({
-    //       next: () => {
-    //         this.loadData();
-    //         this.isLoading = false;
-    //         this.cdr.detectChanges();
-    //       },
-    //       error: (error) => {
-    //         this.isLoading = false;
-    //         this.cdr.detectChanges();
-    //         alert(error.message || 'Error al eliminar usuario');
-    //       }
-    //     });
-    //   }
-    // })
+  delete(item: MaquinariaEquipo): void {
+    Swal.fire({
+      title: 'Confirmar eliminación',
+      text: `¿Estás seguro de que deseas eliminar ${item.nombre}?`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        this.isLoading = true;
+        this.maquinariaService.delete(item._id || item.id!).subscribe({
+          next: () => {
+            this.loadData();
+            this.isLoading = false;
+            this.cdr.detectChanges();
+          },
+          error: (error) => {
+            this.isLoading = false;
+            this.cdr.detectChanges();
+            Swal.fire('Error', error.message || 'Error al eliminar elemento', 'error');
+          }
+        });
+      }
+    })
   }
-  applyFilter(event: Event) {
-    const value = (event.target as HTMLInputElement).value;
-    this.dataSource.filter = value.trim().toLowerCase();
+
+  applyGeneralFilter(event: Event) {
+    const value = (event.target as HTMLInputElement).value.toLowerCase();
+    this.generalFilter = value;
+
+    this.dataSource.filter = JSON.stringify({
+      type: this.strType || "",
+      general: value,
+      status: this.strStatus || ""
+    });
   }
+
+
+  applyTypeFilter(event: Event) {
+    const value = (event.target as HTMLSelectElement).value.toLowerCase();
+    this.strType = value;
+
+    this.dataSource.filter = JSON.stringify({
+      type: value,
+      general: this.generalFilter || "",
+      status: this.strStatus || ""
+    });
+  }
+
+  applyStatusFilter(event: Event) {
+    const value = (event.target as HTMLSelectElement).value.toLowerCase();
+    this.strStatus = value;
+    this.dataSource.filter = JSON.stringify({
+      type: this.strType || "",
+      general: this.generalFilter || "",
+      status: value
+    });
+  }
+
+  customFilterPredicate() {
+    return (data: any, filter: string): boolean => {
+      const parsed = JSON.parse(filter);
+
+      const matchesType =
+        !parsed.type || (data.tipo && data.tipo.toLowerCase().includes(parsed.type));
+
+      const matchesStatus =
+        !parsed.status || (data.estado && data.estado.toLowerCase().includes(parsed.status));
+
+      // Filtro general
+      const matchesGeneral =
+        !parsed.general ||
+        Object.values(data)
+          .join(" ")
+          .toLowerCase()
+          .includes(parsed.general);
+
+      return matchesType && matchesGeneral && matchesStatus;
+    };
+  }
+
 }

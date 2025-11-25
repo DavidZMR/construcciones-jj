@@ -39,3 +39,23 @@ export interface User {
 export type UsersResponse = ApiResponse<User[]>;
 export type UserResponse = ApiResponse<User>;
 
+/**
+ * Interfaz para Maquinaria y Equipo
+ */
+export interface MaquinariaEquipo {
+  _id?: string;
+  id?: string;
+  codigo: string;
+  nombre: string;
+  tipo: 'Vehiculo' | 'Herramienta' | 'Maquinaria';
+  estado?: 'Alta' | 'Baja' | 'Asignado';
+  descripcion?: string;
+  placa?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type MaquinariaEquipoListResponse = ApiResponse<MaquinariaEquipo[]>;
+export type MaquinariaEquipoResponse = ApiResponse<MaquinariaEquipo>;
+
+
