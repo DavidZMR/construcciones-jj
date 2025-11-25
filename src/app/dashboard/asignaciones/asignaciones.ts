@@ -91,7 +91,7 @@ export class Asignaciones implements OnInit, AfterViewInit {
         });
 
         this.dataSource.filterPredicate = this.customFilterPredicate();
-        
+
         this.cdr.detectChanges();
       },
       error: (error) => {
@@ -306,5 +306,116 @@ export class Asignaciones implements OnInit, AfterViewInit {
   getEmpleadoNombre(asignacion: Asignacion): string {
     if (!asignacion.empleado) return '';
     return (asignacion.empleado as any).nombre || '';
+  }
+
+  generatePDF(asignacion: Asignacion) {
+    import('jspdf').then(jsPDF => {
+      import('jspdf-autotable').then(autoTable => {
+        const doc = new jsPDF.default();
+
+        // Folio
+        const now = new Date();
+        const folio = `ASG-${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}-${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
+
+        // Logo
+        const logoUrl = 'assets/images/logo.svg';
+        const img = new Image();
+        img.src = logoUrl;
+        img.onload = () => {
+          // Create canvas to convert SVG to PNG
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+
+          if (ctx) {
+            ctx.drawImage(img, 0, 0);
+            const pngDataUrl = canvas.toDataURL('image/png');
+            // Add logo as PNG (Wider to avoid deformation)
+            doc.addImage(pngDataUrl, 'PNG', 15, 10, 50, 20);
+          }
+
+          // Header
+          doc.setFontSize(14);
+          doc.setFont('helvetica', 'bold');
+          doc.text('CONSTRUCCIONES J.J. S.A. DE C.V.', 70, 20);
+
+          doc.setFontSize(10);
+          doc.setFont('helvetica', 'normal');
+          doc.text('ASIGNACIÓN DE MAQUINARIA Y EQUIPO', 70, 28);
+
+
+          doc.setFontSize(10);
+          doc.setTextColor(220, 53, 69); // Red color for folio
+          doc.text(`FOLIO: ${folio}`, 155, 30);
+          doc.setTextColor(0, 0, 0); // Reset color
+
+          // Info Section
+          doc.setFontSize(10);
+          doc.text(`FECHA: ${new Date(asignacion.fechaAsignacion).toLocaleDateString()}`, 155, 38);
+
+          doc.setLineWidth(0.5);
+          doc.line(15, 45, 195, 45);
+
+          doc.setFont('helvetica', 'bold');
+          doc.text('DATOS DEL EMPLEADO:', 15, 55);
+          doc.setFont('helvetica', 'normal');
+          doc.text((asignacion.empleado as any).nombre || '', 60, 55);
+
+          // Table
+          const machineryData = (asignacion.maquinaria as any[]).map(m => [m.codigo, m.nombre]);
+
+          (autoTable as any).default(doc, {
+            startY: 65,
+            head: [['CÓDIGO', 'DESCRIPCIÓN']],
+            body: machineryData,
+            theme: 'grid',
+            headStyles: { fillColor: [44, 62, 80], textColor: 255 },
+            styles: { fontSize: 9 }
+          });
+
+          const finalY = (doc as any).lastAutoTable.finalY + 10;
+
+          // Legal Text
+          doc.setFontSize(8);
+          const legalText = "ESTOY DE ACUERDO EN DEVOLVER EL EQUIPO DE PROTECCIÓN PERSONAL, HERRAMIENTA Y MAQUINARIA EN BUENAS CONDICIONES, CONSIDERANDO EL DESGASTE POR USO RAZONABLE AL ALMACÉN DE CONSTRUCCIONES JJ UNA VEZ TERMINADOS MIS TRABAJOS CON DONDE LOS NECESITE. SI NO FUESE DE ESTA MANERA, ES DECIR, QUE DIERA MAL USO, LA EMPRESA DEBERÁ DESCONTAR DE MI SALARIO EL VALOR DE REPARACIÓN O EN SU CASO EL VALOR DE REPOSICIÓN. (ART. 110-1 LFT)";
+
+          const splitText = doc.splitTextToSize(legalText, 180);
+          doc.text(splitText, 15, finalY);
+
+          // Signatures
+          const signatureY = finalY + 40;
+
+          doc.setLineWidth(0.2);
+          // Signature 1
+          doc.line(20, signatureY, 70, signatureY);
+          doc.text('RECIBÍ DE CONFORMIDAD', 25, signatureY + 5);
+          doc.text((asignacion.empleado as any).nombre || '', 25, signatureY + 10);
+
+          // Signature 2
+          doc.line(80, signatureY, 130, signatureY);
+          doc.text('COORDINADOR DE ALMACÉN', 85, signatureY + 5);
+
+          // Signature 3
+          doc.line(140, signatureY, 190, signatureY);
+          doc.text('VIGILANCIA', 155, signatureY + 5);
+
+          // Footer
+          const pageHeight = doc.internal.pageSize.height;
+          doc.setFontSize(6);
+          doc.setTextColor(100, 100, 100);
+          const footerText = "ESTE DOCUMENTO CONTIENE INFORMACIÓN PROPIEDAD DE CONSTRUCCIONES J.J. S.A. DE C.V. DE C.V. CONSIDERADA DE USO INTERNO. CUALQUIER DISTRIBUCION O REPRODUCCIÓN SERÁ BAJO AUTORIZACIÓN ESPECÍFICA.";
+          const splitFooter = doc.splitTextToSize(footerText, 180);
+          doc.text(splitFooter, 15, pageHeight - 10);
+
+          doc.save(`Asignacion_${folio}.pdf`);
+        };
+        img.onerror = () => {
+          console.error('Error loading logo');
+          // Fallback without logo or handle error
+          doc.save(`Asignacion_${folio}.pdf`);
+        }
+      });
+    });
   }
 }
