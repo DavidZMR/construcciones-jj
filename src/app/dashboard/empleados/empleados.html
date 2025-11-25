@@ -6,39 +6,77 @@
         <line x1="12" y1="5" x2="12" y2="19"></line>
         <line x1="5" y1="12" x2="19" y2="12"></line>
       </svg>
-      Crear Empleados
+      Nuevo Empleado
     </button>
   </div>
 
-  @if(isLoading) {
+  @if(isLoading && !showModal) {
   <div class="loading">Cargando Empleados...</div>
-  } @else if(users.length === 0) {
+  } @else if(empleados.length === 0 && !isLoading) {
   <div class="empty-state">No hay empleados registrados</div>
   } @else {
-  <div class="form-group search">
-    <input placeholder="Buscar..." (keyup)="applyFilter($event)" class="search-input" />
+  <div class="filtros">
+    <div class="form-group search">
+      <input placeholder="Buscar..." (keyup)="applyGeneralFilter($event)" class="search-input" />
+    </div>
+    <div class="form-group search">
+      <label for="">Tipo</label>
+      <select name="" id="" (change)="applyPuestoFilter($event)">
+        <option value="">Todos los puestos</option>
+        @for(puesto of uniquePuestos; track puesto) {
+        <option [value]="puesto">{{ puesto }}</option>
+        }
+      </select>
+    </div>
+    <div class="form-group search">
+      <label for="">Área</label>
+      <select name="" id="" (change)="applyAreaFilter($event)">
+        <option value="">Todos las Área</option>
+        @for(area of uniqueAreas; track area) {
+        <option [value]="area">{{ area }}</option>
+        }
+      </select>
+    </div>
+    <div class="form-group search">
+      <label for="">Estado</label>
+      <select name="" id="" (change)="applyStatusFilter($event)">
+        <option value="">Todos los estados</option>
+        <option value="Alta">Alta</option>
+        <option value="Baja">Baja</option>
+      </select>
+    </div>
   </div>
   <div class="table-container">
     <table mat-table [dataSource]="dataSource" matSort class="mat-elevation-z2">
 
-      <!-- Usuario -->
-      <ng-container matColumnDef="username">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header>Usuario</th>
-        <td mat-cell *matCellDef="let user">{{ user.username }}</td>
+      <!-- Nombre -->
+      <ng-container matColumnDef="nombre">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Nombre</th>
+        <td mat-cell *matCellDef="let emp">{{ emp.nombre }}</td>
+      </ng-container>
+      <ng-container matColumnDef="area">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Área</th>
+        <td mat-cell *matCellDef="let emp">{{ emp.area }}</td>
       </ng-container>
 
-      <!-- Email -->
-      <ng-container matColumnDef="email">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header>Email</th>
-        <td mat-cell *matCellDef="let user">{{ user.email }}</td>
+      <!-- Puesto -->
+      <ng-container matColumnDef="puesto">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Puesto</th>
+        <td mat-cell *matCellDef="let emp">{{ emp.puesto }}</td>
       </ng-container>
 
-      <!-- Rol -->
-      <ng-container matColumnDef="rol">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header>Rol</th>
-        <td mat-cell *matCellDef="let user">
-          <span class="badge" [class.admin]="user.rol === 'admin'">
-            {{ user.rol }}
+      <!-- Obra -->
+      <ng-container matColumnDef="obra">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Obra</th>
+        <td mat-cell *matCellDef="let emp">{{ emp.obra || '-' }}</td>
+      </ng-container>
+
+      <!-- Obra -->
+      <ng-container matColumnDef="estatus">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Estatus</th>
+        <td mat-cell *matCellDef="let emp">
+          <span class="badge" [class.alta]="emp.estatus === 'ALTA'" [class.baja]="emp.estatus === 'BAJA'">
+            {{ emp.estatus }}
           </span>
         </td>
       </ng-container>
@@ -47,23 +85,22 @@
       <ng-container matColumnDef="acciones">
         <th mat-header-cell *matHeaderCellDef>Acciones</th>
 
-        <td mat-cell *matCellDef="let user" class="actions-cell">
-          <button class="btn-icon btn-edit" (click)="openEditModal(user)" title="Editar">
-            <img src="assets/icons/edit.svg" alt="">
+        <td mat-cell *matCellDef="let emp" class="actions-cell">
+          <button class="btn-icon btn-edit" (click)="openEditModal(emp)" title="Editar">
+            <img src="assets/icons/edit.svg" alt="Editar">
           </button>
 
-          <button class="btn-icon btn-delete" (click)="delete(user)" title="Eliminar">
-            <img src="assets/icons/delete.svg" alt="">
+          <button class="btn-icon btn-delete" (click)="delete(emp)" title="Dar de baja">
+            <img src="assets/icons/delete.svg" alt="Eliminar">
           </button>
         </td>
       </ng-container>
 
-      <!-- Definiciones -->
       <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
       <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
     </table>
 
-    <mat-paginator [pageSize]="5" [pageSizeOptions]="[5, 10, 25]" showFirstLastButtons>
+    <mat-paginator [pageSize]="10" [pageSizeOptions]="[5, 10, 25]" showFirstLastButtons>
     </mat-paginator>
   </div>
 
@@ -71,53 +108,96 @@
 </div>
 
 <!-- Modal -->
-<!-- @if(showModal) {
+@if(showModal) {
 <div class="modal-overlay" (click)="closeModal()">
   <div class="modal-content" (click)="$event.stopPropagation()">
     <div class="modal-header">
-      <h2>{{ isEditing ? 'Editar Usuario' : 'Crear Usuario' }}</h2>
+      <h2>{{ isEditing ? 'Editar Empleado' : 'Nuevo Empleado' }}</h2>
       <button class="modal-close" (click)="closeModal()">×</button>
     </div>
 
-    <form [formGroup]="form" (ngSubmit)="saveUser()" class="modal-body">
+    <form [formGroup]="form" (ngSubmit)="saveEmpleado()" class="modal-body">
       @if(errorMessage) {
       <div class="error-message">{{ errorMessage }}</div>
       }
 
+      <!-- Nombre -->
       <div class="form-group">
-        <label for="username">Usuario *</label>
-        <input id="username" type="text" formControlName="username" placeholder="Nombre de usuario"
-          [class.error]="form.get('username')?.invalid && form.get('username')?.touched" />
-        @if(form.get('username')?.invalid && form.get('username')?.touched) {
-        <span class="field-error">El usuario es requerido (mínimo 3 caracteres)</span>
+        <label for="nombre">Nombre Completo *</label>
+        <input id="nombre" type="text" formControlName="nombre" placeholder="Nombre del empleado"
+          [class.error]="form.get('nombre')?.invalid && form.get('nombre')?.touched" />
+        @if(form.get('nombre')?.invalid && form.get('nombre')?.touched) {
+        <span class="field-error">El nombre es requerido</span>
         }
       </div>
 
+      <!-- Estatus -->
       <div class="form-group">
-        <label for="email">Email *</label>
-        <input id="email" type="email" formControlName="email" placeholder="email@ejemplo.com"
-          [class.error]="form.get('email')?.invalid && form.get('email')?.touched" />
-        @if(form.get('email')?.invalid && form.get('email')?.touched) {
-        <span class="field-error">El email es requerido y debe ser válido</span>
-        }
-      </div>
-
-      <div class="form-group">
-        <label for="password">Contraseña {{ isEditing ? '(opcional)' : '*' }}</label>
-        <input id="password" type="password" formControlName="password" placeholder="Mínimo 6 caracteres"
-          [class.error]="form.get('password')?.invalid && form.get('password')?.touched" />
-        @if(form.get('password')?.invalid && form.get('password')?.touched) {
-        <span class="field-error">La contraseña debe tener al menos 6 caracteres</span>
-        }
-      </div>
-
-      <div class="form-group">
-        <label for="rol">Rol *</label>
-        <select id="rol" formControlName="rol"
-          [class.error]="form.get('rol')?.invalid && form.get('rol')?.touched">
-          <option value="usuario">Usuario</option>
-          <option value="admin">Administrador</option>
+        <label for="estatus">Estatus *</label>
+        <select id="estatus" formControlName="estatus"
+          [class.error]="form.get('estatus')?.invalid && form.get('estatus')?.touched">
+          <option value="ALTA">Alta</option>
+          <option value="BAJA">Baja</option>
         </select>
+      </div>
+
+      <!-- Área -->
+      <div class="form-group">
+        <label for="area">Área *</label>
+        <select id="area" formControlName="area" [class.error]="form.get('area')?.invalid && form.get('area')?.touched">
+          <option value="" disabled>Seleccione un área</option>
+          @for(area of uniqueAreas; track area) {
+          <option [value]="area">{{ area }}</option>
+          }
+          <option [value]="NEW_OPTION">+ Agregar nueva área...</option>
+        </select>
+        @if(form.get('area')?.invalid && form.get('area')?.touched) {
+        <span class="field-error">El área es requerida</span>
+        }
+      </div>
+
+      @if(form.get('area')?.value === NEW_OPTION) {
+      <div class="form-group">
+        <label for="newArea">Nueva Área *</label>
+        <input id="newArea" type="text" formControlName="newArea" placeholder="Especifique el área"
+          [class.error]="form.get('newArea')?.invalid && form.get('newArea')?.touched" />
+        @if(form.get('newArea')?.invalid && form.get('newArea')?.touched) {
+        <span class="field-error">Debe especificar el nombre del área</span>
+        }
+      </div>
+      }
+
+      <!-- Puesto -->
+      <div class="form-group">
+        <label for="puesto">Puesto *</label>
+        <select id="puesto" formControlName="puesto"
+          [class.error]="form.get('puesto')?.invalid && form.get('puesto')?.touched">
+          <option value="" disabled>Seleccione un puesto</option>
+          @for(puesto of uniquePuestos; track puesto) {
+          <option [value]="puesto">{{ puesto }}</option>
+          }
+          <option [value]="NEW_OPTION">+ Agregar nuevo puesto...</option>
+        </select>
+        @if(form.get('puesto')?.invalid && form.get('puesto')?.touched) {
+        <span class="field-error">El puesto es requerido</span>
+        }
+      </div>
+
+      @if(form.get('puesto')?.value === NEW_OPTION) {
+      <div class="form-group">
+        <label for="newPuesto">Nuevo Puesto *</label>
+        <input id="newPuesto" type="text" formControlName="newPuesto" placeholder="Especifique el puesto"
+          [class.error]="form.get('newPuesto')?.invalid && form.get('newPuesto')?.touched" />
+        @if(form.get('newPuesto')?.invalid && form.get('newPuesto')?.touched) {
+        <span class="field-error">Debe especificar el nombre del puesto</span>
+        }
+      </div>
+      }
+
+      <!-- Obra (Opcional) -->
+      <div class="form-group">
+        <label for="obra">Obra (Opcional)</label>
+        <input id="obra" type="text" formControlName="obra" placeholder="Obra asignada" />
       </div>
 
       <div class="modal-footer">
@@ -129,4 +209,4 @@
     </form>
   </div>
 </div>
-} -->
+}

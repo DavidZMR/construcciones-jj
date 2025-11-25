@@ -58,4 +58,20 @@ export interface MaquinariaEquipo {
 export type MaquinariaEquipoListResponse = ApiResponse<MaquinariaEquipo[]>;
 export type MaquinariaEquipoResponse = ApiResponse<MaquinariaEquipo>;
 
+/**
+ * Interfaz para Empleados
+ */
+export interface Empleado {
+  _id?: string;
+  id?: string;
+  nombre: string;
+  estatus: 'Alta' | 'Baja';
+  area: string;
+  puesto: string;
+  obra?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
 
+export type EmpleadoListResponse = ApiResponse<Empleado[]>;
+export type EmpleadoResponse = ApiResponse<Empleado>;
