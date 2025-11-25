@@ -1,8 +1,10 @@
 import { Component, OnInit, ChangeDetectorRef, ViewChild, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { UserService } from '../../services/user.service';
-import { User } from '../../interfaces/api-response.interface';
+import { AsignacionService } from '../../services/asignacion.service';
+import { EmpleadoService } from '../../services/empleado.service';
+import { MaquinariaEquipoService } from '../../services/maquinaria-equipo.service';
+import { Asignacion, Empleado, MaquinariaEquipo } from '../../interfaces/api-response.interface';
 import Swal from 'sweetalert2';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
@@ -20,35 +22,49 @@ import { MatSort, MatSortModule } from '@angular/material/sort';
   templateUrl: './asignaciones.html',
   styleUrl: './asignaciones.scss',
 })
-export class Asignaciones {
-users: any[] = [];
+export class Asignaciones implements OnInit, AfterViewInit {
+  asignaciones: Asignacion[] = [];
+  empleados: Empleado[] = [];
+  maquinaria: MaquinariaEquipo[] = [];
+
   isLoading = false;
   showModal = false;
+  showReturnModal = false;
   isEditing = false;
-  editing: any | null = null;
+  editingId: string | null = null;
+
   form: FormGroup;
+  returnForm: FormGroup;
   errorMessage = '';
 
-  displayedColumns: string[] = ['username', 'email', 'rol', 'acciones'];
-  dataSource = new MatTableDataSource<any>();
+  displayedColumns: string[] = ['fechaAsignacion', 'empleado', 'maquinaria', 'estado', 'fechaDevolucion', 'acciones'];
+  dataSource = new MatTableDataSource<Asignacion>();
 
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
 
   constructor(
     private fb: FormBuilder,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private asignacionService: AsignacionService,
+    private empleadoService: EmpleadoService,
+    private maquinariaService: MaquinariaEquipoService
   ) {
     this.form = this.fb.group({
-      username: ['', [Validators.required, Validators.minLength(3)]],
-      email: ['', [Validators.required, Validators.email]],
-      password: ['', [Validators.minLength(6)]],
-      rol: ['usuario', Validators.required]
+      fechaAsignacion: ['', Validators.required],
+      empleado: ['', Validators.required],
+      maquinaria: [[], Validators.required],
+      observaciones: ['']
+    });
+
+    this.returnForm = this.fb.group({
+      fechaDevolucion: ['', Validators.required]
     });
   }
 
   ngOnInit(): void {
     this.loadData();
+    this.loadCatalogos();
   }
 
   ngAfterViewInit() {
@@ -56,152 +72,202 @@ users: any[] = [];
     this.dataSource.sort = this.sort;
   }
 
-
   loadData(): void {
-    // this.isLoading = true;
+    this.isLoading = true;
+    this.asignacionService.getAll().subscribe({
+      next: (data) => {
+        this.asignaciones = data;
+        this.dataSource.data = data;
+        this.isLoading = false;
 
-    // this.userService.getUsers().subscribe({
-    //   next: (users) => {
-    //     this.users = users;
-    //     this.dataSource = new MatTableDataSource(users);
-
-    //     // reasignar paginator y sort DESPUÉS de crear el dataSource
-    //     setTimeout(() => {
-    //       this.dataSource.paginator = this.paginator;
-    //       this.dataSource.sort = this.sort;
-    //     });
-
-    //     this.isLoading = false;
-    //     this.cdr.detectChanges();
-    //   },
-    //   error: (error) => {
-    //     this.errorMessage = error.message || 'Error al cargar usuarios';
-    //     this.isLoading = false;
-    //   }
-    // });
+        setTimeout(() => {
+          this.dataSource.paginator = this.paginator;
+          this.dataSource.sort = this.sort;
+        });
+        
+        this.cdr.detectChanges();
+      },
+      error: (error) => {
+        console.error('Error loading assignments', error);
+        this.errorMessage = error.message || 'Error al cargar asignaciones';
+        this.isLoading = false;
+        this.cdr.detectChanges();
+      }
+    });
   }
 
+  loadCatalogos(): void {
+    // Cargar empleados activos
+    this.empleadoService.getAll().subscribe({
+      next: (data) => {
+        this.empleados = data.sort((a, b) => a.nombre.localeCompare(b.nombre)).filter(e => e.estatus === 'ALTA');
+      }
+    });
+
+    // Cargar maquinaria disponible
+    this.maquinariaService.getAll().subscribe({
+      next: (data) => {
+        this.maquinaria = data.sort((a, b) => a.nombre.localeCompare(b.nombre)).filter(m => m.estado === 'Alta');
+      }
+    });
+  }
 
   openCreateModal(): void {
     this.isEditing = false;
-    this.editing = null;
+    this.editingId = null;
     this.form.reset({
-      username: '',
-      email: '',
-      password: '',
-      rol: 'usuario'
+      fechaAsignacion: new Date().toISOString().split('T')[0], // Hoy por defecto
+      empleado: '',
+      maquinaria: [],
+      observaciones: ''
     });
-    this.form.get('password')?.setValidators([Validators.required, Validators.minLength(6)]);
-    this.form.get('password')?.updateValueAndValidity();
+    // Recargar maquinaria para asegurar que tenemos la lista actualizada de disponibles
+    this.loadCatalogos();
     this.showModal = true;
     this.errorMessage = '';
-    this.cdr.detectChanges();
   }
 
-  openEditModal(user: any): void {
+  openEditModal(asignacion: Asignacion): void {
+    if (asignacion.estado === 'Finalizado') {
+      Swal.fire('Aviso', 'No se puede editar una asignación finalizada', 'info');
+      return;
+    }
+
     this.isEditing = true;
-    this.editing = user;
+    this.editingId = asignacion._id || asignacion.id || null;
+
+    // Formatear fecha para input date
+    const fecha = asignacion.fechaAsignacion ? new Date(asignacion.fechaAsignacion).toISOString().split('T')[0] : '';
+
+    // Obtener IDs de maquinaria
+    const maquinariaIds = asignacion.maquinaria.map((m: any) => m._id || m.id || m);
+
+    // Para editar, necesitamos mostrar también la maquinaria que ya tiene asignada esta asignación
+    // aunque su estado sea 'Asignado'.
+    // Esto es un poco complejo porque loadCatalogos filtra por 'Alta'.
+    // Vamos a añadir temporalmente la maquinaria de esta asignación a la lista local.
+
+    const maquinariaActual = asignacion.maquinaria as MaquinariaEquipo[];
+
+    // Combinar disponibles + actuales
+    // Nota: Esto es solo visual para el dropdown.
+    // Si el usuario deselecciona una máquina, esta debería volver a estar disponible (pero eso lo maneja el backend al guardar? No, el backend actual maneja creación).
+    // El backend updateAsignacion actual solo actualiza fecha y observaciones.
+    // Si queremos permitir cambiar maquinaria, el backend necesita lógica compleja.
+    // Por ahora, el usuario pidió editar, pero el backend lo limité.
+    // Voy a deshabilitar maquinaria en edición o mostrar advertencia.
+    // O mejor, solo permito editar fecha y observaciones como planeé en backend.
+
     this.form.reset({
-      username: user.username,
-      email: user.email,
-      password: '',
-      rol: user.rol
+      fechaAsignacion: fecha,
+      empleado: (asignacion.empleado as Empleado)._id || (asignacion.empleado as Empleado).id,
+      maquinaria: maquinariaIds,
+      observaciones: asignacion.observaciones || ''
     });
-    this.form.get('password')?.clearValidators();
-    this.form.get('password')?.updateValueAndValidity();
+
+    // Deshabilitar controles que no se pueden cambiar fácilmente sin lógica compleja de backend
+    this.form.get('empleado')?.disable();
+    this.form.get('maquinaria')?.disable();
+
     this.showModal = true;
     this.errorMessage = '';
-    this.cdr.detectChanges();
+  }
+
+  openReturnModal(asignacion: Asignacion): void {
+    this.editingId = asignacion._id || asignacion.id || null;
+    this.returnForm.reset({
+      fechaDevolucion: new Date().toISOString().split('T')[0]
+    });
+    this.showReturnModal = true;
   }
 
   closeModal(): void {
     this.showModal = false;
+    this.showReturnModal = false;
     this.form.reset();
+    this.returnForm.reset();
     this.errorMessage = '';
-    this.cdr.detectChanges();
+    this.form.enable(); // Re-habilitar por si estaba en modo edición
   }
 
-  saveUser(): void {
+  saveAsignacion(): void {
     if (this.form.valid) {
       this.isLoading = true;
       this.errorMessage = '';
 
-      const userData = this.form.value;
+      const formValue = this.form.getRawValue(); // getRawValue para incluir deshabilitados
 
       if (!this.isEditing) {
-        // Crear nuevo usuario
-        // this.userService.createUser(userData).subscribe({
-        //   next: () => {
-        //     this.loadData();
-        //     this.closeModal();
-        //     this.isLoading = false;
-        //     this.cdr.detectChanges();
-        //   },
-        //   error: (error) => {
-        //     this.isLoading = false;
-        //     this.errorMessage = error.message || 'Error al crear usuario';
-        //     this.cdr.detectChanges();
-        //   }
-        // });
+        this.asignacionService.create(formValue).subscribe({
+          next: () => {
+            this.loadData();
+            this.closeModal();
+            Swal.fire('Éxito', 'Asignación creada correctamente', 'success');
+          },
+          error: (error) => {
+            this.isLoading = false;
+            this.errorMessage = error.message || 'Error al crear asignación';
+            this.cdr.detectChanges();
+          }
+        });
       } else {
-        // Actualizar usuario
-        const updateData: any = {
-          username: userData.username,
-          email: userData.email,
-          rol: userData.rol
-        };
+        if (!this.editingId) return;
 
-        if (userData.password) {
-          updateData.password = userData.password;
-        }
-
-        // this.userService.updateUser(this.editingUser!._id || this.editingUser!.id!, updateData).subscribe({
-        //   next: () => {
-        //     this.loadData();
-        //     this.closeModal();
-        //     this.isLoading = false;
-        //     this.cdr.detectChanges();
-        //   },
-        //   error: (error) => {
-        //     this.isLoading = false;
-        //     this.errorMessage = error.message || 'Error al actualizar usuario';
-        //     this.cdr.detectChanges();
-        //   }
-        // });
+        this.asignacionService.update(this.editingId, formValue).subscribe({
+          next: () => {
+            this.loadData();
+            this.closeModal();
+            Swal.fire('Éxito', 'Asignación actualizada correctamente', 'success');
+          },
+          error: (error) => {
+            this.isLoading = false;
+            this.errorMessage = error.message || 'Error al actualizar asignación';
+            this.cdr.detectChanges();
+          }
+        });
       }
     } else {
-      this.errorMessage = 'Por favor, completa todos los campos correctamente.';
+      this.form.markAllAsTouched();
+      this.errorMessage = 'Por favor, completa todos los campos requeridos.';
     }
   }
 
-  delete(user: any): void {
-    // Swal.fire({
-    //   title: 'Confirmar eliminación',
-    //   text: `¿Estás seguro de que deseas eliminar al usuario ${user.username}?`,
-    //   icon: 'warning',
-    //   showCancelButton: true,
-    //   confirmButtonText: 'Sí, eliminar',
-    //   cancelButtonText: 'Cancelar'
-    // }).then((result) => {
-    //   if (result.isConfirmed) {
-    //     this.isLoading = true;
-    //     this.userService.deleteUser(user._id || user.id!).subscribe({
-    //       next: () => {
-    //         this.loadData();
-    //         this.isLoading = false;
-    //         this.cdr.detectChanges();
-    //       },
-    //       error: (error) => {
-    //         this.isLoading = false;
-    //         this.cdr.detectChanges();
-    //         alert(error.message || 'Error al eliminar usuario');
-    //       }
-    //     });
-    //   }
-    // })
+  saveReturn(): void {
+    if (this.returnForm.valid && this.editingId) {
+      this.isLoading = true;
+      const fechaDevolucion = this.returnForm.get('fechaDevolucion')?.value;
+
+      this.asignacionService.returnAsignacion(this.editingId, fechaDevolucion).subscribe({
+        next: () => {
+          this.loadData();
+          this.closeModal();
+          Swal.fire('Éxito', 'Asignación devuelta correctamente', 'success');
+        },
+        error: (error) => {
+          this.isLoading = false;
+          this.errorMessage = error.message || 'Error al devolver asignación';
+          this.cdr.detectChanges();
+        }
+      });
+    }
   }
+
   applyFilter(event: Event) {
     const value = (event.target as HTMLInputElement).value;
     this.dataSource.filter = value.trim().toLowerCase();
+
+    if (this.dataSource.paginator) {
+      this.dataSource.paginator.firstPage();
+    }
+  }
+
+  getMaquinariaNombres(asignacion: Asignacion): string {
+    if (!asignacion.maquinaria || !Array.isArray(asignacion.maquinaria)) return '';
+    return asignacion.maquinaria.map((m: any) => m.nombre).join(', ');
+  }
+
+  getEmpleadoNombre(asignacion: Asignacion): string {
+    if (!asignacion.empleado) return '';
+    return (asignacion.empleado as any).nombre || '';
   }
 }

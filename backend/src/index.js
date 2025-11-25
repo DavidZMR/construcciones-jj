@@ -6,6 +6,7 @@ import authRoutes from './routes/auth.routes.js';
 import userRoutes from './routes/user.routes.js';
 import maquinariaEquipoRoutes from './routes/maquinariaEquipo.routes.js';
 import empleadoRoutes from './routes/empleado.routes.js';
+import asignacionRoutes from './routes/asignacion.routes.js';
 
 // Cargar variables de entorno
 dotenv.config();
@@ -29,6 +30,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/maquinaria-equipo', maquinariaEquipoRoutes);
 app.use('/api/empleados', empleadoRoutes);
+app.use('/api/asignaciones', asignacionRoutes);
 
 import { sendSuccess, sendError } from './utils/response.js';
 

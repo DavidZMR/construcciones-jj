@@ -65,7 +65,7 @@ export interface Empleado {
   _id?: string;
   id?: string;
   nombre: string;
-  estatus: 'Alta' | 'Baja';
+  estatus: 'ALTA' | 'BAJA';
   area: string;
   puesto: string;
   obra?: string;
@@ -75,3 +75,22 @@ export interface Empleado {
 
 export type EmpleadoListResponse = ApiResponse<Empleado[]>;
 export type EmpleadoResponse = ApiResponse<Empleado>;
+
+/**
+ * Interfaz para Asignaciones
+ */
+export interface Asignacion {
+  _id?: string;
+  id?: string;
+  empleado: Empleado | string; // Puede ser el objeto poblado o el ID
+  maquinaria: (MaquinariaEquipo | string)[]; // Array de objetos poblados o IDs
+  fechaAsignacion: string; // ISO Date string
+  fechaDevolucion?: string; // ISO Date string
+  observaciones?: string;
+  estado: 'Activo' | 'Finalizado';
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type AsignacionListResponse = ApiResponse<Asignacion[]>;
+export type AsignacionResponse = ApiResponse<Asignacion>;

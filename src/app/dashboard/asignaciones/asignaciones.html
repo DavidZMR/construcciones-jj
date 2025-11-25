@@ -6,13 +6,13 @@
         <line x1="12" y1="5" x2="12" y2="19"></line>
         <line x1="5" y1="12" x2="19" y2="12"></line>
       </svg>
-      Crear Asignación
+      Nueva Asignación
     </button>
   </div>
 
-  @if(isLoading) {
+  @if(isLoading && !showModal && !showReturnModal) {
   <div class="loading">Cargando Asignaciones...</div>
-  } @else if(users.length === 0) {
+  } @else if(asignaciones.length === 0 && !isLoading) {
   <div class="empty-state">No hay asignaciones registradas</div>
   } @else {
   <div class="form-group search">
@@ -21,25 +21,39 @@
   <div class="table-container">
     <table mat-table [dataSource]="dataSource" matSort class="mat-elevation-z2">
 
-      <!-- Usuario -->
-      <ng-container matColumnDef="username">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header>Usuario</th>
-        <td mat-cell *matCellDef="let user">{{ user.username }}</td>
+      <!-- Fecha Asignación -->
+      <ng-container matColumnDef="fechaAsignacion">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Fecha Asignación</th>
+        <td mat-cell *matCellDef="let item">{{ item.fechaAsignacion | date:'dd-MM-yyyy' : '+0000' }}</td>
       </ng-container>
 
-      <!-- Email -->
-      <ng-container matColumnDef="email">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header>Email</th>
-        <td mat-cell *matCellDef="let user">{{ user.email }}</td>
+      <!-- Empleado -->
+      <ng-container matColumnDef="empleado">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Empleado</th>
+        <td mat-cell *matCellDef="let item">{{ getEmpleadoNombre(item) }}</td>
       </ng-container>
 
-      <!-- Rol -->
-      <ng-container matColumnDef="rol">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header>Rol</th>
-        <td mat-cell *matCellDef="let user">
-          <span class="badge" [class.admin]="user.rol === 'admin'">
-            {{ user.rol }}
+      <!-- Maquinaria -->
+      <ng-container matColumnDef="maquinaria">
+        <th mat-header-cell *matHeaderCellDef>Maquinaria</th>
+        <td mat-cell *matCellDef="let item">{{ getMaquinariaNombres(item) }}</td>
+      </ng-container>
+
+      <!-- Estado -->
+      <ng-container matColumnDef="estado">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Estado</th>
+        <td mat-cell *matCellDef="let item">
+          <span class="badge" [class.alta]="item.estado === 'Activo'" [class.baja]="item.estado === 'Finalizado'">
+            {{ item.estado }}
           </span>
+        </td>
+      </ng-container>
+
+      <!-- Fecha Devolución -->
+      <ng-container matColumnDef="fechaDevolucion">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Fecha Devolución</th>
+        <td mat-cell *matCellDef="let item">
+          {{ item.fechaDevolucion ? (item.fechaDevolucion | date:'dd-MM-yyyy' : '+0000') : '-' }}
         </td>
       </ng-container>
 
@@ -47,77 +61,91 @@
       <ng-container matColumnDef="acciones">
         <th mat-header-cell *matHeaderCellDef>Acciones</th>
 
-        <td mat-cell *matCellDef="let user" class="actions-cell">
-          <button class="btn-icon btn-edit" (click)="openEditModal(user)" title="Editar">
-            <img src="assets/icons/edit.svg" alt="">
+        <td mat-cell *matCellDef="let item" class="actions-cell">
+          @if(item.estado === 'Activo') {
+          <button class="btn-icon btn-edit" (click)="openEditModal(item)" title="Editar">
+            <img src="assets/icons/edit.svg" alt="Editar">
           </button>
 
-          <button class="btn-icon btn-delete" (click)="delete(user)" title="Eliminar">
-            <img src="assets/icons/delete.svg" alt="">
+          <button class="btn-icon btn-delete" (click)="openReturnModal(item)" title="Devolver">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2f855a" stroke-width="2">
+              <path d="M9 14l-4-4 4-4" />
+              <path d="M5 10h11a4 4 0 1 1 0 8h-1" />
+            </svg>
           </button>
+          }
         </td>
       </ng-container>
 
-      <!-- Definiciones -->
       <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
       <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
     </table>
 
-    <mat-paginator [pageSize]="5" [pageSizeOptions]="[5, 10, 25]" showFirstLastButtons>
+    <mat-paginator [pageSize]="10" [pageSizeOptions]="[5, 10, 25]" showFirstLastButtons>
     </mat-paginator>
   </div>
 
   }
 </div>
 
-<!-- Modal -->
-<!-- @if(showModal) {
+<!-- Modal Crear/Editar -->
+@if(showModal) {
 <div class="modal-overlay" (click)="closeModal()">
   <div class="modal-content" (click)="$event.stopPropagation()">
     <div class="modal-header">
-      <h2>{{ isEditing ? 'Editar Usuario' : 'Crear Usuario' }}</h2>
+      <h2>{{ isEditing ? 'Editar Asignación' : 'Nueva Asignación' }}</h2>
       <button class="modal-close" (click)="closeModal()">×</button>
     </div>
 
-    <form [formGroup]="form" (ngSubmit)="saveUser()" class="modal-body">
+    <form [formGroup]="form" (ngSubmit)="saveAsignacion()" class="modal-body">
       @if(errorMessage) {
       <div class="error-message">{{ errorMessage }}</div>
       }
 
+      <!-- Fecha Asignación -->
       <div class="form-group">
-        <label for="username">Usuario *</label>
-        <input id="username" type="text" formControlName="username" placeholder="Nombre de usuario"
-          [class.error]="form.get('username')?.invalid && form.get('username')?.touched" />
-        @if(form.get('username')?.invalid && form.get('username')?.touched) {
-        <span class="field-error">El usuario es requerido (mínimo 3 caracteres)</span>
+        <label for="fechaAsignacion">Fecha de Asignación *</label>
+        <input id="fechaAsignacion" type="date" formControlName="fechaAsignacion"
+          [class.error]="form.get('fechaAsignacion')?.invalid && form.get('fechaAsignacion')?.touched" />
+        @if(form.get('fechaAsignacion')?.invalid && form.get('fechaAsignacion')?.touched) {
+        <span class="field-error">La fecha es requerida</span>
         }
       </div>
 
+      <!-- Empleado -->
       <div class="form-group">
-        <label for="email">Email *</label>
-        <input id="email" type="email" formControlName="email" placeholder="email@ejemplo.com"
-          [class.error]="form.get('email')?.invalid && form.get('email')?.touched" />
-        @if(form.get('email')?.invalid && form.get('email')?.touched) {
-        <span class="field-error">El email es requerido y debe ser válido</span>
-        }
-      </div>
-
-      <div class="form-group">
-        <label for="password">Contraseña {{ isEditing ? '(opcional)' : '*' }}</label>
-        <input id="password" type="password" formControlName="password" placeholder="Mínimo 6 caracteres"
-          [class.error]="form.get('password')?.invalid && form.get('password')?.touched" />
-        @if(form.get('password')?.invalid && form.get('password')?.touched) {
-        <span class="field-error">La contraseña debe tener al menos 6 caracteres</span>
-        }
-      </div>
-
-      <div class="form-group">
-        <label for="rol">Rol *</label>
-        <select id="rol" formControlName="rol"
-          [class.error]="form.get('rol')?.invalid && form.get('rol')?.touched">
-          <option value="usuario">Usuario</option>
-          <option value="admin">Administrador</option>
+        <label for="empleado">Empleado *</label>
+        <select id="empleado" formControlName="empleado"
+          [class.error]="form.get('empleado')?.invalid && form.get('empleado')?.touched">
+          <option value="" disabled>Seleccione un empleado</option>
+          @for(emp of empleados; track emp._id) {
+          <option [value]="emp._id || emp.id">{{ emp.nombre }}</option>
+          }
         </select>
+        @if(form.get('empleado')?.invalid && form.get('empleado')?.touched) {
+        <span class="field-error">El empleado es requerido</span>
+        }
+      </div>
+
+      <!-- Maquinaria -->
+      <div class="form-group">
+        <label for="maquinaria">Maquinaria y Equipo *</label>
+        <select id="maquinaria" formControlName="maquinaria" multiple size="5"
+          [class.error]="form.get('maquinaria')?.invalid && form.get('maquinaria')?.touched">
+          @for(maq of maquinaria; track maq._id) {
+          <option [value]="maq._id || maq.id">{{ maq.nombre }} ({{ maq.codigo }})</option>
+          }
+        </select>
+        <small class="hint">Mantenga presionado Ctrl para seleccionar múltiples</small>
+        @if(form.get('maquinaria')?.invalid && form.get('maquinaria')?.touched) {
+        <span class="field-error">Debe seleccionar al menos un equipo</span>
+        }
+      </div>
+
+      <!-- Observaciones -->
+      <div class="form-group">
+        <label for="observaciones">Observaciones</label>
+        <textarea id="observaciones" formControlName="observaciones" rows="3"></textarea>
       </div>
 
       <div class="modal-footer">
@@ -129,4 +157,34 @@
     </form>
   </div>
 </div>
-} -->
+}
+
+<!-- Modal Devolver -->
+@if(showReturnModal) {
+<div class="modal-overlay" (click)="closeModal()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h2>Devolver Asignación</h2>
+      <button class="modal-close" (click)="closeModal()">×</button>
+    </div>
+
+    <form [formGroup]="returnForm" (ngSubmit)="saveReturn()" class="modal-body">
+      <div class="form-group">
+        <label for="fechaDevolucion">Fecha de Devolución *</label>
+        <input id="fechaDevolucion" type="date" formControlName="fechaDevolucion"
+          [class.error]="returnForm.get('fechaDevolucion')?.invalid && returnForm.get('fechaDevolucion')?.touched" />
+        @if(returnForm.get('fechaDevolucion')?.invalid && returnForm.get('fechaDevolucion')?.touched) {
+        <span class="field-error">La fecha es requerida</span>
+        }
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+        <button type="submit" class="btn-primary" [disabled]="isLoading || returnForm.invalid">
+          {{ isLoading ? 'Procesando...' : 'Confirmar Devolución' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+}
