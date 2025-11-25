@@ -15,8 +15,18 @@
   } @else if(asignaciones.length === 0 && !isLoading) {
   <div class="empty-state">No hay asignaciones registradas</div>
   } @else {
-  <div class="form-group search">
-    <input placeholder="Buscar..." (keyup)="applyFilter($event)" class="search-input" />
+  <div class="filtros">
+    <div class="form-group search">
+      <input placeholder="Buscar..." (keyup)="applyGeneralFilter($event)" class="search-input" />
+    </div>
+    <div class="form-group search">
+      <label for="">Estado</label>
+      <select name="" id="" (change)="applyStatusFilter($event)">
+        <option value="">Todos los estados</option>
+        <option value="Activo">Activo</option>
+        <option value="Finalizado">Finalizado</option>
+      </select>
+    </div>
   </div>
   <div class="table-container">
     <table mat-table [dataSource]="dataSource" matSort class="mat-elevation-z2">

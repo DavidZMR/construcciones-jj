@@ -37,6 +37,9 @@ export class Asignaciones implements OnInit, AfterViewInit {
   returnForm: FormGroup;
   errorMessage = '';
 
+  generalFilter = ''
+  strStatus = ''
+
   displayedColumns: string[] = ['fechaAsignacion', 'empleado', 'maquinaria', 'estado', 'fechaDevolucion', 'acciones'];
   dataSource = new MatTableDataSource<Asignacion>();
 
@@ -70,6 +73,8 @@ export class Asignaciones implements OnInit, AfterViewInit {
   ngAfterViewInit() {
     this.dataSource.paginator = this.paginator;
     this.dataSource.sort = this.sort;
+
+    this.dataSource.filterPredicate = this.customFilterPredicate();
   }
 
   loadData(): void {
@@ -84,6 +89,8 @@ export class Asignaciones implements OnInit, AfterViewInit {
           this.dataSource.paginator = this.paginator;
           this.dataSource.sort = this.sort;
         });
+
+        this.dataSource.filterPredicate = this.customFilterPredicate();
         
         this.cdr.detectChanges();
       },
@@ -252,13 +259,43 @@ export class Asignaciones implements OnInit, AfterViewInit {
     }
   }
 
-  applyFilter(event: Event) {
-    const value = (event.target as HTMLInputElement).value;
-    this.dataSource.filter = value.trim().toLowerCase();
+  applyGeneralFilter(event: Event) {
+    const value = (event.target as HTMLInputElement).value.toLowerCase();
+    this.generalFilter = value;
 
-    if (this.dataSource.paginator) {
-      this.dataSource.paginator.firstPage();
-    }
+    this.dataSource.filter = JSON.stringify({
+      general: value,
+      status: this.strStatus || "",
+    });
+  }
+
+  applyStatusFilter(event: Event) {
+    const value = (event.target as HTMLSelectElement).value.toLowerCase();
+    this.strStatus = value;
+    this.dataSource.filter = JSON.stringify({
+      general: this.generalFilter || "",
+      status: value,
+    });
+  }
+
+  customFilterPredicate() {
+    return (data: any, filter: string): boolean => {
+      const parsed = JSON.parse(filter);
+
+      const matchesStatus =
+        !parsed.status || (data.estado && data.estado.toLowerCase().includes(parsed.status));
+
+
+      // Filtro general
+      const matchesGeneral =
+        !parsed.general ||
+        Object.values(data)
+          .join(" ")
+          .toLowerCase()
+          .includes(parsed.general);
+
+      return matchesGeneral && matchesStatus;
+    };
   }
 
   getMaquinariaNombres(asignacion: Asignacion): string {
