@@ -84,6 +84,7 @@ export interface Asignacion {
   id?: string;
   empleado: Empleado | string; // Puede ser el objeto poblado o el ID
   maquinaria: (MaquinariaEquipo | string)[]; // Array de objetos poblados o IDs
+  obra?: any; // Obra poblada o ID. Usamos any temporalmente para evitar dependencias circulares o complejas si Obra no está aquí.
   fechaAsignacion: string; // ISO Date string
   fechaDevolucion?: string; // ISO Date string
   observaciones?: string;

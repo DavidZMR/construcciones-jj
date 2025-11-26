@@ -7,6 +7,7 @@ export const getAsignaciones = async (req, res) => {
         const asignaciones = await Asignacion.find()
             .populate('empleado', 'nombre')
             .populate('maquinaria', 'nombre codigo tipo')
+            .populate('obra', 'nombre_obra numero_contrato')
             .sort({ createdAt: -1 });
         return sendSuccess(res, 'Asignaciones obtenidas exitosamente', asignaciones);
     } catch (error) {
@@ -17,7 +18,7 @@ export const getAsignaciones = async (req, res) => {
 
 export const createAsignacion = async (req, res) => {
     try {
-        const { empleado, maquinaria, fechaAsignacion, observaciones } = req.body;
+        const { empleado, maquinaria, fechaAsignacion, observaciones, obra } = req.body;
 
         if (!empleado || !maquinaria || !maquinaria.length || !fechaAsignacion) {
             return sendBadRequest(res, 'Empleado, maquinaria y fecha de asignación son requeridos');
@@ -40,6 +41,7 @@ export const createAsignacion = async (req, res) => {
             maquinaria,
             fechaAsignacion,
             observaciones,
+            obra,
             estado: 'Activo'
         });
 
@@ -51,7 +53,8 @@ export const createAsignacion = async (req, res) => {
 
         const populatedAsignacion = await Asignacion.findById(newAsignacion._id)
             .populate('empleado', 'nombre')
-            .populate('maquinaria', 'nombre codigo tipo');
+            .populate('maquinaria', 'nombre codigo tipo')
+            .populate('obra', 'nombre_obra numero_contrato');
 
         return sendCreated(res, 'Asignación creada exitosamente', populatedAsignacion);
     } catch (error) {
@@ -103,17 +106,19 @@ export const updateAsignacion = async (req, res) => {
         // Para simplificar, si quieren cambiar maquinaria, mejor que borren y creen otra o devuelvan.
         // Pero el usuario pidió editar. Vamos a permitir editar campos simples.
 
-        const { fechaAsignacion, observaciones } = req.body;
+        const { fechaAsignacion, observaciones, obra } = req.body;
         const updateData = {};
         if (fechaAsignacion) updateData.fechaAsignacion = fechaAsignacion;
         if (observaciones !== undefined) updateData.observaciones = observaciones;
+        if (obra !== undefined) updateData.obra = obra;
 
         const asignacion = await Asignacion.findByIdAndUpdate(
             req.params.id,
             updateData,
             { new: true }
         ).populate('empleado', 'nombre')
-            .populate('maquinaria', 'nombre codigo tipo');
+            .populate('maquinaria', 'nombre codigo tipo')
+            .populate('obra', 'nombre_obra numero_contrato');
 
         if (!asignacion) {
             return sendNotFound(res, 'Asignación no encontrada');

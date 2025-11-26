@@ -4,6 +4,7 @@ import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { AsignacionService } from '../../services/asignacion.service';
 import { EmpleadoService } from '../../services/empleado.service';
 import { MaquinariaEquipoService } from '../../services/maquinaria-equipo.service';
+import { ObraService, Obra } from '../../services/obra.service';
 import { Asignacion, Empleado, MaquinariaEquipo } from '../../interfaces/api-response.interface';
 import Swal from 'sweetalert2';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
@@ -26,6 +27,7 @@ export class Asignaciones implements OnInit, AfterViewInit {
   asignaciones: Asignacion[] = [];
   empleados: Empleado[] = [];
   maquinaria: MaquinariaEquipo[] = [];
+  obras: Obra[] = [];
 
   isLoading = false;
   showModal = false;
@@ -40,7 +42,7 @@ export class Asignaciones implements OnInit, AfterViewInit {
   generalFilter = ''
   strStatus = ''
 
-  displayedColumns: string[] = ['fechaAsignacion', 'empleado', 'maquinaria', 'estado', 'fechaDevolucion', 'acciones'];
+  displayedColumns: string[] = ['fechaAsignacion', 'empleado', 'obra', 'maquinaria', 'estado', 'fechaDevolucion', 'acciones'];
   dataSource = new MatTableDataSource<Asignacion>();
 
   @ViewChild(MatPaginator) paginator!: MatPaginator;
@@ -51,12 +53,14 @@ export class Asignaciones implements OnInit, AfterViewInit {
     private cdr: ChangeDetectorRef,
     private asignacionService: AsignacionService,
     private empleadoService: EmpleadoService,
-    private maquinariaService: MaquinariaEquipoService
+    private maquinariaService: MaquinariaEquipoService,
+    private obraService: ObraService
   ) {
     this.form = this.fb.group({
       fechaAsignacion: ['', Validators.required],
       empleado: ['', Validators.required],
       maquinaria: [[], Validators.required],
+      obra: [''],
       observaciones: ['']
     });
 
@@ -117,6 +121,13 @@ export class Asignaciones implements OnInit, AfterViewInit {
         this.maquinaria = data.sort((a, b) => a.nombre.localeCompare(b.nombre)).filter(m => m.estado === 'Alta');
       }
     });
+
+    // Cargar obras activas
+    this.obraService.getAll().subscribe({
+      next: (data) => {
+        this.obras = data.sort((a, b) => a.nombre_obra.localeCompare(b.nombre_obra)).filter(o => o.estatus === 'ALTA');
+      }
+    });
   }
 
   openCreateModal(): void {
@@ -126,6 +137,7 @@ export class Asignaciones implements OnInit, AfterViewInit {
       fechaAsignacion: new Date().toISOString().split('T')[0], // Hoy por defecto
       empleado: '',
       maquinaria: [],
+      obra: '',
       observaciones: ''
     });
     // Recargar maquinaria para asegurar que tenemos la lista actualizada de disponibles
@@ -169,6 +181,7 @@ export class Asignaciones implements OnInit, AfterViewInit {
       fechaAsignacion: fecha,
       empleado: (asignacion.empleado as Empleado)._id || (asignacion.empleado as Empleado).id,
       maquinaria: maquinariaIds,
+      obra: asignacion.obra ? (asignacion.obra._id || asignacion.obra.id || asignacion.obra) : '',
       observaciones: asignacion.observaciones || ''
     });
 
@@ -306,6 +319,11 @@ export class Asignaciones implements OnInit, AfterViewInit {
   getEmpleadoNombre(asignacion: Asignacion): string {
     if (!asignacion.empleado) return '';
     return (asignacion.empleado as any).nombre || '';
+  }
+
+  getObraNombre(asignacion: Asignacion): string {
+    if (!asignacion.obra) return '-';
+    return (asignacion.obra as any).nombre_obra || '-';
   }
 
   generatePDF(asignacion: Asignacion) {

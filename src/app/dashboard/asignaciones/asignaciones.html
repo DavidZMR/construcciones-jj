@@ -43,6 +43,12 @@
         <td mat-cell *matCellDef="let item">{{ getEmpleadoNombre(item) }}</td>
       </ng-container>
 
+      <!-- Obra -->
+      <ng-container matColumnDef="obra">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Obra</th>
+        <td mat-cell *matCellDef="let item">{{ getObraNombre(item) }}</td>
+      </ng-container>
+
       <!-- Maquinaria -->
       <ng-container matColumnDef="maquinaria">
         <th mat-header-cell *matHeaderCellDef>Maquinaria</th>
@@ -143,6 +149,17 @@
         @if(form.get('empleado')?.invalid && form.get('empleado')?.touched) {
         <span class="field-error">El empleado es requerido</span>
         }
+      </div>
+
+      <!-- Obra -->
+      <div class="form-group">
+        <label for="obra">Obra (Opcional)</label>
+        <select id="obra" formControlName="obra">
+          <option value="">Sin obra asignada</option>
+          @for(obra of obras; track obra._id) {
+          <option [value]="obra._id || obra.id">{{ obra.nombre_obra }} ({{ obra.numero_contrato }})</option>
+          }
+        </select>
       </div>
 
       <!-- Maquinaria -->

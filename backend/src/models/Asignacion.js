@@ -21,6 +21,10 @@ const asignacionSchema = new mongoose.Schema({
         type: String,
         trim: true
     },
+    obra: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Obra'
+    },
     estado: {
         type: String,
         enum: ['Activo', 'Finalizado'],
