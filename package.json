@@ -9,7 +9,8 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "electron:dev": "concurrently \"ng build --watch\" \"wait-on dist/construcciones-jj/browser/index.html && electron .\"",
-    "electron:build": "ng build --base-href ./ && electron-builder"
+    "electron:build": "ng build --base-href ./ && electron-builder",
+    "verify-build": "node verificar-empaquetado.js"
   },
   "build": {
     "appId": "com.construccionesjj.app",
@@ -38,6 +39,10 @@
       {
         "from": "backend/.env",
         "to": "backend/.env"
+      },
+      {
+        "from": "backend/package.json",
+        "to": "backend/package.json"
       }
     ],
     "win": {
