@@ -380,11 +380,16 @@ export class Asignaciones implements OnInit, AfterViewInit {
           doc.setFont('helvetica', 'normal');
           doc.text((asignacion.empleado as any).nombre || '', 60, 55);
 
+          doc.setFont('helvetica', 'bold');
+          doc.text('OBRA:', 15, 62);
+          doc.setFont('helvetica', 'normal');
+          doc.text(this.getObraNombre(asignacion), 60, 62);
+
           // Table
           const machineryData = (asignacion.maquinaria as any[]).map(m => [m.codigo, m.nombre]);
 
           (autoTable as any).default(doc, {
-            startY: 65,
+            startY: 70,
             head: [['CÓDIGO', 'DESCRIPCIÓN']],
             body: machineryData,
             theme: 'grid',
