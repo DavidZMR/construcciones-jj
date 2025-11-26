@@ -1,59 +1,134 @@
-# ConstruccionesJj
+# Construcciones JJ
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 21.0.0.
+Aplicación de escritorio para gestión de construcciones, desarrollada con Angular y Electron.
 
-## Development server
+## Requisitos Previos
 
-To start a local development server, run:
+- Node.js (versión 18 o superior)
+- npm (versión 10.8.2 o superior)
+- MongoDB (local o MongoDB Atlas)
 
-```bash
-ng serve
-```
+## Instalación
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
-
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+### 1. Instalar dependencias en la carpeta raíz
 
 ```bash
-ng generate component component-name
+npm install
 ```
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+### 2. Instalar dependencias del backend
 
 ```bash
-ng generate --help
+cd backend
+npm install
+cd ..
 ```
 
-## Building
+### 3. Configurar variables de entorno
 
-To build the project run:
+Crear un archivo `.env` en la carpeta `backend` con las siguientes credenciales:
+
+```env
+# MongoDB
+MONGODB_URI=mongodb://localhost:27017/construcciones-jj
+# O para MongoDB Atlas:
+# MONGODB_URI=mongodb+srv://usuario:password@cluster.mongodb.net/construcciones-jj
+
+# JWT
+JWT_SECRET=tu_clave_secreta_super_segura_aqui
+
+# Puerto del servidor
+PORT=3000
+```
+
+**Importante:** Asegúrate de usar una conexión MongoDB accesible desde cualquier equipo si planeas distribuir la aplicación.
+
+## Desarrollo
+
+### Ejecutar en modo desarrollo
 
 ```bash
-ng build
+npm run electron:dev
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+Esto iniciará el servidor de desarrollo de Angular y abrirá la aplicación Electron.
 
-## Running unit tests
-
-To execute unit tests with the [Karma](https://karma-runner.github.io) test runner, use the following command:
+### Solo frontend (Angular)
 
 ```bash
-ng test
+npm run start
 ```
 
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
+### Solo backend
 
 ```bash
-ng e2e
+cd backend
+npm run dev
 ```
 
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
+## Generar Instalador
 
-## Additional Resources
+Para crear el instalador ejecutable (.exe) de la aplicación:
 
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+```bash
+npm run electron:build
+```
+
+El instalador se generará en la carpeta `release/`.
+
+**Nota:** Antes de generar el instalador, asegúrate de:
+- Tener todas las dependencias instaladas (raíz y backend)
+- Configurar correctamente el archivo `.env` en la carpeta `backend`
+- Usar una URI de MongoDB accesible desde otros equipos (MongoDB Atlas recomendado)
+
+## Estructura del Proyecto
+
+```
+construcciones-jj/
+├── src/                    # Código fuente Angular (frontend)
+├── backend/                # API Node.js + Express
+│   ├── src/               # Código fuente del backend
+│   ├── .env               # Variables de entorno (crear manualmente)
+│   └── package.json       # Dependencias del backend
+├── dist/                   # Build del frontend
+├── release/                # Instaladores generados
+├── main.js                 # Proceso principal de Electron
+└── package.json            # Dependencias principales
+
+```
+
+## Tecnologías
+
+- **Frontend:** Angular 21, Angular Material
+- **Backend:** Node.js, Express, MongoDB, Mongoose
+- **Desktop:** Electron
+- **Autenticación:** JWT (JSON Web Tokens)
+
+## Comandos Útiles
+
+| Comando | Descripción |
+|---------|-------------|
+| `npm run start` | Servidor de desarrollo Angular |
+| `npm run build` | Build de producción Angular |
+| `npm run electron:dev` | Desarrollo con Electron |
+| `npm run electron:build` | Generar instalador |
+| `cd backend && npm run dev` | Servidor backend en desarrollo |
+| `cd backend && npm run create-user` | Crear usuario administrador |
+
+## Solución de Problemas
+
+### El backend no funciona en el instalador
+
+1. Verifica que instalaste las dependencias del backend: `cd backend && npm install`
+2. Asegúrate de que el archivo `backend/.env` existe y tiene las credenciales correctas
+3. Si usas MongoDB local, considera migrar a MongoDB Atlas para distribución
+
+### Error de conexión a MongoDB
+
+- Verifica que MongoDB esté corriendo (si es local)
+- Verifica que la URI en `.env` sea correcta
+- Para MongoDB Atlas, asegúrate de permitir acceso desde cualquier IP (0.0.0.0/0)
+
+## Licencia
+
+Privado - Construcciones JJ

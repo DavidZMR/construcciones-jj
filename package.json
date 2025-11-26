@@ -27,8 +27,17 @@
         "from": "backend",
         "to": "backend",
         "filter": [
-          "**/*"
+          "**/*",
+          "!node_modules/**/*"
         ]
+      },
+      {
+        "from": "backend/node_modules",
+        "to": "backend/node_modules"
+      },
+      {
+        "from": "backend/.env",
+        "to": "backend/.env"
       }
     ],
     "win": {
