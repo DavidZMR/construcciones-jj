@@ -1,0 +1,136 @@
+<div class="usuarios-container">
+    <div class="usuarios-header">
+        <h1>Catálogo de Obras</h1>
+        <button class="btn-primary" (click)="openCreateModal()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Nueva Obra
+        </button>
+    </div>
+
+    @if(isLoading && !showModal) {
+    <div class="loading">Cargando Obras...</div>
+    } @else if(obras.length === 0 && !isLoading) {
+    <div class="empty-state">No hay obras registradas</div>
+    } @else {
+    <div class="filtros">
+        <div class="form-group search">
+            <input placeholder="Buscar por contrato o nombre..." (keyup)="applyGeneralFilter($event)"
+                class="search-input" />
+        </div>
+        <div class="form-group search">
+            <label for="">Estado</label>
+            <select name="" id="" (change)="applyStatusFilter($event)">
+                <option value="">Todos los estados</option>
+                <option value="ALTA">Alta</option>
+                <option value="BAJA">Baja</option>
+            </select>
+        </div>
+    </div>
+    <div class="table-container">
+        <table mat-table [dataSource]="dataSource" matSort class="mat-elevation-z2">
+
+            <!-- Número de Contrato -->
+            <ng-container matColumnDef="numero_contrato">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header>No. Contrato</th>
+                <td mat-cell *matCellDef="let obra">{{ obra.numero_contrato }}</td>
+            </ng-container>
+
+            <!-- Nombre de Obra -->
+            <ng-container matColumnDef="nombre_obra">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header>Nombre de la Obra</th>
+                <td mat-cell *matCellDef="let obra">{{ obra.nombre_obra }}</td>
+            </ng-container>
+
+            <!-- Estatus -->
+            <ng-container matColumnDef="estatus">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header>Estatus</th>
+                <td mat-cell *matCellDef="let obra">
+                    <span class="badge" [class.alta]="obra.estatus === 'ALTA'" [class.baja]="obra.estatus === 'BAJA'">
+                        {{ obra.estatus }}
+                    </span>
+                </td>
+            </ng-container>
+
+            <!-- Acciones -->
+            <ng-container matColumnDef="acciones">
+                <th mat-header-cell *matHeaderCellDef>Acciones</th>
+
+                <td mat-cell *matCellDef="let obra" class="actions-cell">
+                    <button class="btn-icon btn-edit" (click)="openEditModal(obra)" title="Editar">
+                        <img src="assets/icons/edit.svg" alt="Editar">
+                    </button>
+
+                    <button class="btn-icon btn-delete" (click)="delete(obra)" title="Dar de baja">
+                        <img src="assets/icons/delete.svg" alt="Eliminar">
+                    </button>
+                </td>
+            </ng-container>
+
+            <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+            <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+        </table>
+
+        <mat-paginator [pageSize]="10" [pageSizeOptions]="[5, 10, 25]" showFirstLastButtons>
+        </mat-paginator>
+    </div>
+
+    }
+</div>
+
+<!-- Modal -->
+@if(showModal) {
+<div class="modal-overlay" (click)="closeModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+            <h2>{{ isEditing ? 'Editar Obra' : 'Nueva Obra' }}</h2>
+            <button class="modal-close" (click)="closeModal()">×</button>
+        </div>
+
+        <form [formGroup]="form" (ngSubmit)="saveObra()" class="modal-body">
+            @if(errorMessage) {
+            <div class="error-message">{{ errorMessage }}</div>
+            }
+
+            <!-- Número de Contrato -->
+            <div class="form-group">
+                <label for="numero_contrato">Número de Contrato *</label>
+                <input id="numero_contrato" type="text" formControlName="numero_contrato" placeholder="Ej. CON-2023-001"
+                    [class.error]="form.get('numero_contrato')?.invalid && form.get('numero_contrato')?.touched" />
+                @if(form.get('numero_contrato')?.invalid && form.get('numero_contrato')?.touched) {
+                <span class="field-error">El número de contrato es requerido</span>
+                }
+            </div>
+
+            <!-- Nombre de Obra -->
+            <div class="form-group">
+                <label for="nombre_obra">Nombre de la Obra *</label>
+                <input id="nombre_obra" type="text" formControlName="nombre_obra" placeholder="Nombre de la obra"
+                    [class.error]="form.get('nombre_obra')?.invalid && form.get('nombre_obra')?.touched" />
+                @if(form.get('nombre_obra')?.invalid && form.get('nombre_obra')?.touched) {
+                <span class="field-error">El nombre de la obra es requerido</span>
+                }
+            </div>
+
+            <!-- Estatus -->
+            <div class="form-group">
+                <label for="estatus">Estatus *</label>
+                <select id="estatus" formControlName="estatus"
+                    [class.error]="form.get('estatus')?.invalid && form.get('estatus')?.touched">
+                    <option value="ALTA">Alta</option>
+                    <option value="BAJA">Baja</option>
+                </select>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+                <button type="submit" class="btn-primary" [disabled]="isLoading || form.invalid">
+                    {{ isLoading ? 'Guardando...' : (isEditing ? 'Actualizar' : 'Crear') }}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+}
