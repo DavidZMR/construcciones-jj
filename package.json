@@ -1,12 +1,39 @@
 {
   "name": "construcciones-jj",
   "version": "0.0.0",
+  "main": "main.js",
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "electron:dev": "concurrently \"ng build --watch\" \"wait-on dist/construcciones-jj/browser/index.html && electron .\"",
+    "electron:build": "ng build --base-href ./ && electron-builder"
+  },
+  "build": {
+    "appId": "com.construccionesjj.app",
+    "productName": "Construcciones JJ",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "main.js",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "backend",
+        "to": "backend",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": "nsis"
+    }
   },
   "prettier": {
     "printWidth": 100,
@@ -41,8 +68,12 @@
     "@angular/build": "^21.0.0",
     "@angular/cli": "^21.0.0",
     "@angular/compiler-cli": "^21.0.0",
+    "concurrently": "^9.2.1",
+    "electron": "^39.2.3",
+    "electron-builder": "^26.0.12",
     "jsdom": "^27.1.0",
     "typescript": "~5.9.2",
-    "vitest": "^4.0.8"
+    "vitest": "^4.0.8",
+    "wait-on": "^9.0.3"
   }
 }

@@ -1,0 +1,12 @@
+.mat-mdc-row,
+.mat-mdc-header-row {
+  height: auto !important;
+}
+
+.mat-mdc-cell,
+.mat-mdc-header-cell {
+  height: auto !important;
+  padding-top: 12px !important;
+  padding-bottom: 12px !important;
+  white-space: normal !important; /* Permite saltos de línea en textos largos */
+}

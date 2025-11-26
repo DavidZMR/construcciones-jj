@@ -151,9 +151,6 @@ body {
   overflow-x: auto;
 }
 
-table td {
-  height: 60px;
-}
 
 .badge {
   display: inline-block;
@@ -200,11 +197,14 @@ table td {
   }
 }
 
+
 .actions-cell {
-  display: flex;
-  align-items: center;
+  display: grid;
+  min-height: 60px;
+  height: auto;
   gap: 8px;
 }
+
 
 .btn-icon {
   height: 40px;
@@ -212,7 +212,7 @@ table td {
   border: none;
   cursor: pointer;
   padding: 6px;
-  border-radius: 4px;
+  border-radius: 4px; 
   display: flex;
   align-items: center;
   justify-content: center;
