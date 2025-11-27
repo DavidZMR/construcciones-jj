@@ -1,0 +1,23 @@
+.hint {
+    display: block;
+    font-size: 12px;
+    color: #718096;
+    margin-top: 4px;
+    font-style: italic;
+}
+
+select[multiple] {
+    height: auto;
+    min-height: 120px;
+    padding: 8px;
+
+    option {
+        padding: 8px;
+        border-bottom: 1px solid #f7fafc;
+
+        &:checked {
+            background-color: #e6f2ff;
+            color: #0d1b2a;
+        }
+    }
+}

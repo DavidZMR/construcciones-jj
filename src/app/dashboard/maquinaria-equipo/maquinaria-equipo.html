@@ -1,0 +1,170 @@
+<div class="usuarios-container">
+  <div class="usuarios-header">
+    <h1>Maquinaria y Equipo</h1>
+    <button class="btn-primary" (click)="openCreateModal()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <line x1="5" y1="12" x2="19" y2="12"></line>
+      </svg>
+      Crear Nuevo
+    </button>
+  </div>
+
+  @if(isLoading && !showModal) {
+  <div class="loading">Cargando datos...</div>
+  } @else if(items.length === 0 && !isLoading) {
+  <div class="empty-state">No hay maquinaria o equipos registrados</div>
+  } @else {
+  <div class="filtros">
+    <div class="form-group search">
+      <input placeholder="Buscar..." (keyup)="applyGeneralFilter($event)" class="search-input" />
+    </div>
+    <div class="form-group search">
+      <label for="">Tipo</label>
+      <select name="" id="" (change)="applyTypeFilter($event)">
+        <option value="">Todos los tipos</option>
+        <option value="Herramienta">Herramienta</option>
+        <option value="Maquinaria">Maquinaria</option>
+        <option value="Vehículo">Vehículo</option>
+      </select>
+    </div>
+    <div class="form-group search">
+      <label for="">Estado</label>
+      <select name="" id="" (change)="applyStatusFilter($event)">
+        <option value="">Todos los estados</option>
+        <option value="Alta">Alta</option>
+        <option value="Asignado">Asignado</option>
+        <option value="Baja">Baja</option>
+      </select>
+    </div>
+  </div>
+  <div class="table-container">
+    <table mat-table [dataSource]="dataSource" matSort class="mat-elevation-z2">
+
+      <!-- Codigo -->
+      <ng-container matColumnDef="codigo">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Código</th>
+        <td mat-cell *matCellDef="let item">{{ item.codigo }}</td>
+      </ng-container>
+
+      <!-- Nombre -->
+      <ng-container matColumnDef="nombre">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Nombre</th>
+        <td mat-cell *matCellDef="let item">{{ item.nombre }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="tipo">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Tipo</th>
+        <td mat-cell *matCellDef="let item">
+          <span class="badge" [class.maquinaria]="item.tipo === 'Maquinaria'" [class.herramienta]="item.tipo === 'Herramienta'" [class.vehiculo]="item.tipo === 'Vehiculo'">
+            {{ item.tipo }}
+          </span>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="placa">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Placa</th>
+        <td mat-cell *matCellDef="let item">{{ item.placa ?? ' - ' }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="estado">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Estado</th>
+        <td mat-cell *matCellDef="let item">
+          <span class="badge" [class.alta]="item.estado === 'Alta'" [class.baja]="item.estado === 'Baja'" [class.asignado]="item.estado === 'Asignado'">
+            {{ item.estado }}
+          </span>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="acciones">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Acciones</th>
+        <td mat-cell *matCellDef="let item" class="actions-cell">
+          <button class="btn-icon btn-edit" (click)="openEditModal(item)" title="Editar">
+              <img src="assets/icons/edit.svg" alt="">
+            </button>
+            
+            <button class="btn-icon btn-delete" (click)="delete(item)" title="Eliminar">
+              <img src="assets/icons/delete.svg" alt="">
+            </button>
+        </td>
+      </ng-container>
+
+      <!-- Definiciones -->
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr> 
+    </table>
+
+    <mat-paginator [pageSize]="5" [pageSizeOptions]="[5, 10, 25]" showFirstLastButtons>
+    </mat-paginator>
+  </div>
+
+  }
+</div>
+
+<!-- Modal -->
+@if(showModal) {
+<div class="modal-overlay" (click)="closeModal()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h2>{{ isEditing ? 'Editar Elemento' : 'Crear Elemento' }}</h2>
+      <button class="modal-close" (click)="closeModal()">×</button>
+    </div>
+
+    <form [formGroup]="form" (ngSubmit)="save()" class="modal-body">
+      @if(errorMessage) {
+      <div class="error-message">{{ errorMessage }}</div>
+      }
+
+      <div class="form-group">
+        <label for="codigo">Código *</label>
+        <input id="codigo" type="text" formControlName="codigo" placeholder="Código único"
+          [class.error]="form.get('codigo')?.invalid && form.get('codigo')?.touched" />
+        @if(form.get('codigo')?.invalid && form.get('codigo')?.touched) {
+        <span class="field-error">El código es requerido</span>
+        }
+      </div>
+
+      <div class="form-group">
+        <label for="nombre">Nombre *</label>
+        <input id="nombre" type="text" formControlName="nombre" placeholder="Nombre del equipo"
+          [class.error]="form.get('nombre')?.invalid && form.get('nombre')?.touched" />
+        @if(form.get('nombre')?.invalid && form.get('nombre')?.touched) {
+        <span class="field-error">El nombre es requerido</span>
+        }
+      </div>
+
+      <div class="form-group">
+        <label for="tipo">Tipo *</label>
+        <select id="tipo" formControlName="tipo" [class.error]="form.get('tipo')?.invalid && form.get('tipo')?.touched">
+          <option value="Herramienta">Herramienta</option>
+          <option value="Maquinaria">Maquinaria</option>
+          <option value="Vehiculo">Vehículo</option>
+        </select>
+      </div>
+
+      @if(form.get('tipo')?.value === 'Vehiculo') {
+      <div class="form-group">
+        <label for="placa">Placa *</label>
+        <input id="placa" type="text" formControlName="placa" placeholder="Placa del vehículo"
+          [class.error]="form.get('placa')?.invalid && form.get('placa')?.touched" />
+        @if(form.get('placa')?.invalid && form.get('placa')?.touched) {
+        <span class="field-error">La placa es requerida para vehículos</span>
+        }
+      </div>
+      }
+
+      <div class="form-group">
+        <label for="descripcion">Descripción</label>
+        <textarea id="descripcion" formControlName="descripcion" placeholder="Descripción opcional" rows="3"></textarea>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+        <button type="submit" class="btn-primary" [disabled]="isLoading || form.invalid">
+          {{ isLoading ? 'Guardando...' : (isEditing ? 'Actualizar' : 'Crear') }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+}

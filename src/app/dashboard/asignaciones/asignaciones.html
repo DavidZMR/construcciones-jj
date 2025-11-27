@@ -1,0 +1,257 @@
+<div class="usuarios-container">
+  <div class="usuarios-header">
+    <h1>Asignaciones</h1>
+    <button class="btn-primary" (click)="openCreateModal()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <line x1="5" y1="12" x2="19" y2="12"></line>
+      </svg>
+      Nueva Asignación
+    </button>
+  </div>
+
+  @if(isLoading && !showModal && !showReturnModal) {
+  <div class="loading">Cargando Asignaciones...</div>
+  } @else if(asignaciones.length === 0 && !isLoading) {
+  <div class="empty-state">No hay asignaciones registradas</div>
+  } @else {
+  <div class="filtros">
+    <div class="form-group search">
+      <input placeholder="Buscar..." (keyup)="applyGeneralFilter($event)" class="search-input" />
+    </div>
+    <div class="form-group search">
+      <label for="">Estado</label>
+      <select name="" id="" (change)="applyStatusFilter($event)">
+        <option value="">Todos los estados</option>
+        <option value="Activo">Activo</option>
+        <option value="Finalizado">Finalizado</option>
+      </select>
+    </div>
+  </div>
+  <div class="table-container">
+    <table mat-table [dataSource]="dataSource" matSort class="mat-elevation-z2">
+
+      <!-- Fecha Asignación -->
+      <ng-container matColumnDef="fechaAsignacion">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Fecha Asignación</th>
+        <td mat-cell *matCellDef="let item">{{ item.fechaAsignacion | date:'dd-MM-yyyy' : '+0000' }}</td>
+      </ng-container>
+
+      <!-- Empleado -->
+      <ng-container matColumnDef="empleado">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Empleado</th>
+        <td mat-cell *matCellDef="let item">{{ getEmpleadoNombre(item) }}</td>
+      </ng-container>
+
+      <!-- Obra -->
+      <ng-container matColumnDef="obra">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Obra</th>
+        <td mat-cell *matCellDef="let item">{{ getObraNombre(item) }}</td>
+      </ng-container>
+
+      <!-- Maquinaria -->
+      <ng-container matColumnDef="maquinaria">
+        <th mat-header-cell *matHeaderCellDef>Maquinaria</th>
+        <td mat-cell *matCellDef="let item">{{ getMaquinariaNombres(item) }}</td>
+      </ng-container>
+
+      <!-- Estado -->
+      <ng-container matColumnDef="estado">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Estado</th>
+        <td mat-cell *matCellDef="let item">
+          <span class="badge" [class.alta]="item.estado === 'Activo'" [class.baja]="item.estado === 'Finalizado'">
+            {{ item.estado }}
+          </span>
+        </td>
+      </ng-container>
+
+      <!-- Fecha Devolución -->
+      <ng-container matColumnDef="fechaDevolucion">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Fecha Devolución</th>
+        <td mat-cell *matCellDef="let item">
+          {{ item.fechaDevolucion ? (item.fechaDevolucion | date:'dd-MM-yyyy' : '+0000') : '-' }}
+        </td>
+      </ng-container>
+
+      <!-- Acciones -->
+      <ng-container matColumnDef="acciones">
+        <th mat-header-cell *matHeaderCellDef>Acciones</th>
+
+        <td mat-cell *matCellDef="let item" class="actions-cell">
+          @if(item.estado === 'Activo') {
+          <button class="btn-icon btn-edit" (click)="openEditModal(item)" title="Editar">
+            <img src="assets/icons/edit.svg" alt="Editar">
+          </button>
+
+          <button class="btn-icon btn-delete" (click)="openReturnModal(item)" title="Devolver">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2f855a" stroke-width="2">
+              <path d="M9 14l-4-4 4-4" />
+              <path d="M5 10h11a4 4 0 1 1 0 8h-1" />
+            </svg>
+          </button>
+          }
+
+          <button class="btn-icon btn-print" (click)="generatePDF(item)" title="Imprimir Comprobante">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4a5568" stroke-width="2">
+              <path d="M6 9V2h12v7"></path>
+              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+              <path d="M6 14h12v8H6z"></path>
+            </svg>
+          </button>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+    </table>
+
+    <mat-paginator [pageSize]="10" [pageSizeOptions]="[5, 10, 25]" showFirstLastButtons>
+    </mat-paginator>
+  </div>
+
+  }
+</div>
+
+<!-- Modal Crear/Editar -->
+@if(showModal) {
+<div class="modal-overlay" (click)="closeModal()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h2>{{ isEditing ? 'Editar Asignación' : 'Nueva Asignación' }}</h2>
+      <button class="modal-close" (click)="closeModal()">×</button>
+    </div>
+
+    <form [formGroup]="form" (ngSubmit)="saveAsignacion()" class="modal-body">
+      @if(errorMessage) {
+      <div class="error-message">{{ errorMessage }}</div>
+      }
+
+      <!-- Fecha Asignación -->
+      <div class="form-group">
+        <label for="fechaAsignacion">Fecha de Asignación *</label>
+        <input id="fechaAsignacion" type="date" formControlName="fechaAsignacion"
+          [class.error]="form.get('fechaAsignacion')?.invalid && form.get('fechaAsignacion')?.touched" />
+        @if(form.get('fechaAsignacion')?.invalid && form.get('fechaAsignacion')?.touched) {
+        <span class="field-error">La fecha es requerida</span>
+        }
+      </div>
+
+      <!-- Empleado -->
+      <div class="form-group">
+        <label for="empleado">Empleado *</label>
+        <select id="empleado" formControlName="empleado"
+          [class.error]="form.get('empleado')?.invalid && form.get('empleado')?.touched">
+          <option value="" disabled>Seleccione un empleado</option>
+          @for(emp of empleados; track emp._id) {
+          <option [value]="emp._id || emp.id">{{ emp.nombre }}</option>
+          }
+        </select>
+        @if(form.get('empleado')?.invalid && form.get('empleado')?.touched) {
+        <span class="field-error">El empleado es requerido</span>
+        }
+      </div>
+
+      <!-- Obra -->
+      <div class="form-group">
+        <label for="obra">Obra (Opcional)</label>
+        <select id="obra" formControlName="obra">
+          <option value="">Sin obra asignada</option>
+          @for(obra of obras; track obra._id) {
+          <option [value]="obra._id || obra.id">{{ obra.nombre_obra }} ({{ obra.numero_contrato }})</option>
+          }
+        </select>
+      </div>
+
+      <!-- Maquinaria -->
+      <div class="form-group">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <label>Maquinaria y Equipo *</label>
+          @if(!isEditing) {
+          <button type="button" class="btn-secondary btn-sm" (click)="addMaquinariaItem()">+ Agregar Equipo</button>
+          }
+        </div>
+
+        <div formArrayName="maquinaria">
+          @for(item of maquinariaFormArray.controls; track $index) {
+          <div [formGroupName]="$index" class="maquinaria-item-row"
+            style="border: 1px solid #e2e8f0; padding: 10px; margin-bottom: 10px; border-radius: 6px; background: #f8fafc;">
+
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px; margin-bottom: 10px;">
+              <!-- Item Selection -->
+              <div>
+                <label style="font-size: 0.8em; color: #64748b;">Equipo</label>
+                <select formControlName="item"
+                  style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">
+                  <option value="" disabled>Seleccione equipo</option>
+                  @for(maq of maquinaria; track maq._id) {
+                  <option [value]="maq._id || maq.id">{{ maq.nombre }} ({{ maq.codigo }})</option>
+                  }
+                </select>
+              </div>
+
+              <!-- Quantity -->
+              <div>
+                <label style="font-size: 0.8em; color: #64748b;">Cantidad</label>
+                <input type="number" formControlName="cantidad" min="1"
+                  style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">
+              </div>
+            </div>
+
+            <!-- Observations -->
+            <div style="margin-bottom: 5px;">
+              <label style="font-size: 0.8em; color: #64748b;">Observaciones</label>
+              <input type="text" formControlName="observaciones" placeholder="Observaciones específicas..."
+                style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">
+            </div>
+
+            <!-- Remove Button -->
+            @if(!isEditing && maquinariaFormArray.length > 1) {
+            <div style="text-align: right;">
+              <button type="button" class="btn-danger btn-sm" (click)="removeMaquinariaItem($index)"
+                style="font-size: 0.8em; padding: 4px 8px;">Eliminar</button>
+            </div>
+            }
+          </div>
+          }
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+          <button type="submit" class="btn-primary" [disabled]="isLoading || form.invalid">
+            {{ isLoading ? 'Guardando...' : (isEditing ? 'Actualizar' : 'Crear') }}
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+}
+
+<!-- Modal Devolver -->
+@if(showReturnModal) {
+<div class="modal-overlay" (click)="closeModal()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h2>Devolver Asignación</h2>
+      <button class="modal-close" (click)="closeModal()">×</button>
+    </div>
+
+    <form [formGroup]="returnForm" (ngSubmit)="saveReturn()" class="modal-body">
+      <div class="form-group">
+        <label for="fechaDevolucion">Fecha de Devolución *</label>
+        <input id="fechaDevolucion" type="date" formControlName="fechaDevolucion"
+          [class.error]="returnForm.get('fechaDevolucion')?.invalid && returnForm.get('fechaDevolucion')?.touched" />
+        @if(returnForm.get('fechaDevolucion')?.invalid && returnForm.get('fechaDevolucion')?.touched) {
+        <span class="field-error">La fecha es requerida</span>
+        }
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+        <button type="submit" class="btn-primary" [disabled]="isLoading || returnForm.invalid">
+          {{ isLoading ? 'Procesando...' : 'Confirmar Devolución' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+}

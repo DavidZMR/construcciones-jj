@@ -1,0 +1,212 @@
+<div class="usuarios-container">
+  <div class="usuarios-header">
+    <h1>Empleados</h1>
+    <button class="btn-primary" (click)="openCreateModal()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <line x1="5" y1="12" x2="19" y2="12"></line>
+      </svg>
+      Nuevo Empleado
+    </button>
+  </div>
+
+  @if(isLoading && !showModal) {
+  <div class="loading">Cargando Empleados...</div>
+  } @else if(empleados.length === 0 && !isLoading) {
+  <div class="empty-state">No hay empleados registrados</div>
+  } @else {
+  <div class="filtros">
+    <div class="form-group search">
+      <input placeholder="Buscar..." (keyup)="applyGeneralFilter($event)" class="search-input" />
+    </div>
+    <div class="form-group search">
+      <label for="">Tipo</label>
+      <select name="" id="" (change)="applyPuestoFilter($event)">
+        <option value="">Todos los puestos</option>
+        @for(puesto of uniquePuestos; track puesto) {
+        <option [value]="puesto">{{ puesto }}</option>
+        }
+      </select>
+    </div>
+    <div class="form-group search">
+      <label for="">Área</label>
+      <select name="" id="" (change)="applyAreaFilter($event)">
+        <option value="">Todos las Área</option>
+        @for(area of uniqueAreas; track area) {
+        <option [value]="area">{{ area }}</option>
+        }
+      </select>
+    </div>
+    <div class="form-group search">
+      <label for="">Estado</label>
+      <select name="" id="" (change)="applyStatusFilter($event)">
+        <option value="">Todos los estados</option>
+        <option value="Alta">Alta</option>
+        <option value="Baja">Baja</option>
+      </select>
+    </div>
+  </div>
+  <div class="table-container">
+    <table mat-table [dataSource]="dataSource" matSort class="mat-elevation-z2">
+
+      <!-- Nombre -->
+      <ng-container matColumnDef="nombre">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Nombre</th>
+        <td mat-cell *matCellDef="let emp">{{ emp.nombre }}</td>
+      </ng-container>
+      <ng-container matColumnDef="area">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Área</th>
+        <td mat-cell *matCellDef="let emp">{{ emp.area }}</td>
+      </ng-container>
+
+      <!-- Puesto -->
+      <ng-container matColumnDef="puesto">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Puesto</th>
+        <td mat-cell *matCellDef="let emp">{{ emp.puesto }}</td>
+      </ng-container>
+
+      <!-- Obra -->
+      <ng-container matColumnDef="obra">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Obra</th>
+        <td mat-cell *matCellDef="let emp">{{ emp.obra || '-' }}</td>
+      </ng-container>
+
+      <!-- Obra -->
+      <ng-container matColumnDef="estatus">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Estatus</th>
+        <td mat-cell *matCellDef="let emp">
+          <span class="badge" [class.alta]="emp.estatus === 'ALTA'" [class.baja]="emp.estatus === 'BAJA'">
+            {{ emp.estatus }}
+          </span>
+        </td>
+      </ng-container>
+
+      <!-- Acciones -->
+      <ng-container matColumnDef="acciones">
+        <th mat-header-cell *matHeaderCellDef>Acciones</th>
+
+        <td mat-cell *matCellDef="let emp" class="actions-cell">
+          <button class="btn-icon btn-edit" (click)="openEditModal(emp)" title="Editar">
+            <img src="assets/icons/edit.svg" alt="Editar">
+          </button>
+
+          <button class="btn-icon btn-delete" (click)="delete(emp)" title="Dar de baja">
+            <img src="assets/icons/delete.svg" alt="Eliminar">
+          </button>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+    </table>
+
+    <mat-paginator [pageSize]="10" [pageSizeOptions]="[5, 10, 25]" showFirstLastButtons>
+    </mat-paginator>
+  </div>
+
+  }
+</div>
+
+<!-- Modal -->
+@if(showModal) {
+<div class="modal-overlay" (click)="closeModal()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h2>{{ isEditing ? 'Editar Empleado' : 'Nuevo Empleado' }}</h2>
+      <button class="modal-close" (click)="closeModal()">×</button>
+    </div>
+
+    <form [formGroup]="form" (ngSubmit)="saveEmpleado()" class="modal-body">
+      @if(errorMessage) {
+      <div class="error-message">{{ errorMessage }}</div>
+      }
+
+      <!-- Nombre -->
+      <div class="form-group">
+        <label for="nombre">Nombre Completo *</label>
+        <input id="nombre" type="text" formControlName="nombre" placeholder="Nombre del empleado"
+          [class.error]="form.get('nombre')?.invalid && form.get('nombre')?.touched" />
+        @if(form.get('nombre')?.invalid && form.get('nombre')?.touched) {
+        <span class="field-error">El nombre es requerido</span>
+        }
+      </div>
+
+      <!-- Estatus -->
+      <div class="form-group">
+        <label for="estatus">Estatus *</label>
+        <select id="estatus" formControlName="estatus"
+          [class.error]="form.get('estatus')?.invalid && form.get('estatus')?.touched">
+          <option value="ALTA">Alta</option>
+          <option value="BAJA">Baja</option>
+        </select>
+      </div>
+
+      <!-- Área -->
+      <div class="form-group">
+        <label for="area">Área *</label>
+        <select id="area" formControlName="area" [class.error]="form.get('area')?.invalid && form.get('area')?.touched">
+          <option value="" disabled>Seleccione un área</option>
+          @for(area of uniqueAreas; track area) {
+          <option [value]="area">{{ area }}</option>
+          }
+          <option [value]="NEW_OPTION">+ Agregar nueva área...</option>
+        </select>
+        @if(form.get('area')?.invalid && form.get('area')?.touched) {
+        <span class="field-error">El área es requerida</span>
+        }
+      </div>
+
+      @if(form.get('area')?.value === NEW_OPTION) {
+      <div class="form-group">
+        <label for="newArea">Nueva Área *</label>
+        <input id="newArea" type="text" formControlName="newArea" placeholder="Especifique el área"
+          [class.error]="form.get('newArea')?.invalid && form.get('newArea')?.touched" />
+        @if(form.get('newArea')?.invalid && form.get('newArea')?.touched) {
+        <span class="field-error">Debe especificar el nombre del área</span>
+        }
+      </div>
+      }
+
+      <!-- Puesto -->
+      <div class="form-group">
+        <label for="puesto">Puesto *</label>
+        <select id="puesto" formControlName="puesto"
+          [class.error]="form.get('puesto')?.invalid && form.get('puesto')?.touched">
+          <option value="" disabled>Seleccione un puesto</option>
+          @for(puesto of uniquePuestos; track puesto) {
+          <option [value]="puesto">{{ puesto }}</option>
+          }
+          <option [value]="NEW_OPTION">+ Agregar nuevo puesto...</option>
+        </select>
+        @if(form.get('puesto')?.invalid && form.get('puesto')?.touched) {
+        <span class="field-error">El puesto es requerido</span>
+        }
+      </div>
+
+      @if(form.get('puesto')?.value === NEW_OPTION) {
+      <div class="form-group">
+        <label for="newPuesto">Nuevo Puesto *</label>
+        <input id="newPuesto" type="text" formControlName="newPuesto" placeholder="Especifique el puesto"
+          [class.error]="form.get('newPuesto')?.invalid && form.get('newPuesto')?.touched" />
+        @if(form.get('newPuesto')?.invalid && form.get('newPuesto')?.touched) {
+        <span class="field-error">Debe especificar el nombre del puesto</span>
+        }
+      </div>
+      }
+
+      <!-- Obra (Opcional) -->
+      <div class="form-group">
+        <label for="obra">Obra (Opcional)</label>
+        <input id="obra" type="text" formControlName="obra" placeholder="Obra asignada" />
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+        <button type="submit" class="btn-primary" [disabled]="isLoading || form.invalid">
+          {{ isLoading ? 'Guardando...' : (isEditing ? 'Actualizar' : 'Crear') }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+}

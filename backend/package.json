@@ -1,0 +1,29 @@
+{
+  "name": "construcciones-jj-backend",
+  "version": "1.0.0",
+  "description": "Backend API para Construcciones JJ",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "create-user": "node src/scripts/createUser.js"
+  },
+  "keywords": [
+    "express",
+    "mongodb",
+    "jwt",
+    "api"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "mongoose": "^8.0.3",
+    "jsonwebtoken": "^9.0.2",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1"
+  }
+}
+
