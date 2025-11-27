@@ -164,30 +164,62 @@
 
       <!-- Maquinaria -->
       <div class="form-group">
-        <label for="maquinaria">Maquinaria y Equipo *</label>
-        <select id="maquinaria" formControlName="maquinaria" multiple size="5"
-          [class.error]="form.get('maquinaria')?.invalid && form.get('maquinaria')?.touched">
-          @for(maq of maquinaria; track maq._id) {
-          <option [value]="maq._id || maq.id">{{ maq.nombre }} ({{ maq.codigo }})</option>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <label>Maquinaria y Equipo *</label>
+          @if(!isEditing) {
+          <button type="button" class="btn-secondary btn-sm" (click)="addMaquinariaItem()">+ Agregar Equipo</button>
           }
-        </select>
-        <small class="hint">Mantenga presionado Ctrl para seleccionar múltiples</small>
-        @if(form.get('maquinaria')?.invalid && form.get('maquinaria')?.touched) {
-        <span class="field-error">Debe seleccionar al menos un equipo</span>
-        }
-      </div>
+        </div>
 
-      <!-- Observaciones -->
-      <div class="form-group">
-        <label for="observaciones">Observaciones</label>
-        <textarea id="observaciones" formControlName="observaciones" rows="3"></textarea>
-      </div>
+        <div formArrayName="maquinaria">
+          @for(item of maquinariaFormArray.controls; track $index) {
+          <div [formGroupName]="$index" class="maquinaria-item-row"
+            style="border: 1px solid #e2e8f0; padding: 10px; margin-bottom: 10px; border-radius: 6px; background: #f8fafc;">
 
-      <div class="modal-footer">
-        <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
-        <button type="submit" class="btn-primary" [disabled]="isLoading || form.invalid">
-          {{ isLoading ? 'Guardando...' : (isEditing ? 'Actualizar' : 'Crear') }}
-        </button>
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px; margin-bottom: 10px;">
+              <!-- Item Selection -->
+              <div>
+                <label style="font-size: 0.8em; color: #64748b;">Equipo</label>
+                <select formControlName="item"
+                  style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">
+                  <option value="" disabled>Seleccione equipo</option>
+                  @for(maq of maquinaria; track maq._id) {
+                  <option [value]="maq._id || maq.id">{{ maq.nombre }} ({{ maq.codigo }})</option>
+                  }
+                </select>
+              </div>
+
+              <!-- Quantity -->
+              <div>
+                <label style="font-size: 0.8em; color: #64748b;">Cantidad</label>
+                <input type="number" formControlName="cantidad" min="1"
+                  style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">
+              </div>
+            </div>
+
+            <!-- Observations -->
+            <div style="margin-bottom: 5px;">
+              <label style="font-size: 0.8em; color: #64748b;">Observaciones</label>
+              <input type="text" formControlName="observaciones" placeholder="Observaciones específicas..."
+                style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">
+            </div>
+
+            <!-- Remove Button -->
+            @if(!isEditing && maquinariaFormArray.length > 1) {
+            <div style="text-align: right;">
+              <button type="button" class="btn-danger btn-sm" (click)="removeMaquinariaItem($index)"
+                style="font-size: 0.8em; padding: 4px 8px;">Eliminar</button>
+            </div>
+            }
+          </div>
+          }
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+          <button type="submit" class="btn-primary" [disabled]="isLoading || form.invalid">
+            {{ isLoading ? 'Guardando...' : (isEditing ? 'Actualizar' : 'Crear') }}
+          </button>
+        </div>
       </div>
     </form>
   </div>

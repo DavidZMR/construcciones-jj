@@ -7,8 +7,21 @@ const asignacionSchema = new mongoose.Schema({
         required: [true, 'El empleado es requerido']
     },
     maquinaria: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'MaquinariaEquipo'
+        item: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'MaquinariaEquipo',
+            required: true
+        },
+        cantidad: {
+            type: Number,
+            required: true,
+            default: 1,
+            min: [1, 'La cantidad debe ser mayor a 0']
+        },
+        observaciones: {
+            type: String,
+            trim: true
+        }
     }],
     fechaAsignacion: {
         type: Date,
@@ -17,10 +30,7 @@ const asignacionSchema = new mongoose.Schema({
     fechaDevolucion: {
         type: Date
     },
-    observaciones: {
-        type: String,
-        trim: true
-    },
+    // observaciones removed from here as it is now per item
     obra: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Obra'

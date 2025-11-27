@@ -1,6 +1,6 @@
 import { Component, OnInit, ChangeDetectorRef, ViewChild, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, FormGroup, FormArray, ReactiveFormsModule, Validators } from '@angular/forms';
 import { AsignacionService } from '../../services/asignacion.service';
 import { EmpleadoService } from '../../services/empleado.service';
 import { MaquinariaEquipoService } from '../../services/maquinaria-equipo.service';
@@ -59,14 +59,17 @@ export class Asignaciones implements OnInit, AfterViewInit {
     this.form = this.fb.group({
       fechaAsignacion: ['', Validators.required],
       empleado: ['', Validators.required],
-      maquinaria: [[], Validators.required],
-      obra: [''],
-      observaciones: ['']
+      maquinaria: this.fb.array([], Validators.required),
+      obra: ['']
     });
 
     this.returnForm = this.fb.group({
       fechaDevolucion: ['', Validators.required]
     });
+  }
+
+  get maquinariaFormArray() {
+    return this.form.get('maquinaria') as FormArray;
   }
 
   ngOnInit(): void {
@@ -118,7 +121,7 @@ export class Asignaciones implements OnInit, AfterViewInit {
     // Cargar maquinaria disponible
     this.maquinariaService.getAll().subscribe({
       next: (data) => {
-        this.maquinaria = data.sort((a, b) => a.nombre.localeCompare(b.nombre)).filter(m => m.estado === 'Alta');
+        this.maquinaria = data.sort((a, b) => a.nombre.localeCompare(b.nombre));
       }
     });
 
@@ -130,16 +133,30 @@ export class Asignaciones implements OnInit, AfterViewInit {
     });
   }
 
+  addMaquinariaItem(item?: any) {
+    const group = this.fb.group({
+      item: [item?.item || '', Validators.required],
+      cantidad: [item?.cantidad || 1, [Validators.required, Validators.min(1)]],
+      observaciones: [item?.observaciones || '']
+    });
+    this.maquinariaFormArray.push(group);
+  }
+
+  removeMaquinariaItem(index: number) {
+    this.maquinariaFormArray.removeAt(index);
+  }
+
   openCreateModal(): void {
     this.isEditing = false;
     this.editingId = null;
     this.form.reset({
       fechaAsignacion: new Date().toISOString().split('T')[0], // Hoy por defecto
       empleado: '',
-      maquinaria: [],
-      obra: '',
-      observaciones: ''
+      obra: ''
     });
+    this.maquinariaFormArray.clear();
+    this.addMaquinariaItem(); // Add one empty item by default
+
     // Recargar maquinaria para asegurar que tenemos la lista actualizada de disponibles
     this.loadCatalogos();
     this.showModal = true;
@@ -158,36 +175,24 @@ export class Asignaciones implements OnInit, AfterViewInit {
     // Formatear fecha para input date
     const fecha = asignacion.fechaAsignacion ? new Date(asignacion.fechaAsignacion).toISOString().split('T')[0] : '';
 
-    // Obtener IDs de maquinaria
-    const maquinariaIds = asignacion.maquinaria.map((m: any) => m._id || m.id || m);
+    this.maquinariaFormArray.clear();
+    if (asignacion.maquinaria && Array.isArray(asignacion.maquinaria)) {
+      asignacion.maquinaria.forEach((m: any) => {
+        // Handle both populated object and ID (though it should be populated)
+        const itemId = m.item && (m.item._id || m.item.id) ? (m.item._id || m.item.id) : m.item;
+        this.addMaquinariaItem({
+          item: itemId,
+          cantidad: m.cantidad,
+          observaciones: m.observaciones
+        });
+      });
+    }
 
-    // Para editar, necesitamos mostrar también la maquinaria que ya tiene asignada esta asignación
-    // aunque su estado sea 'Asignado'.
-    // Esto es un poco complejo porque loadCatalogos filtra por 'Alta'.
-    // Vamos a añadir temporalmente la maquinaria de esta asignación a la lista local.
-
-    const maquinariaActual = asignacion.maquinaria as MaquinariaEquipo[];
-
-    // Combinar disponibles + actuales
-    // Nota: Esto es solo visual para el dropdown.
-    // Si el usuario deselecciona una máquina, esta debería volver a estar disponible (pero eso lo maneja el backend al guardar? No, el backend actual maneja creación).
-    // El backend updateAsignacion actual solo actualiza fecha y observaciones.
-    // Si queremos permitir cambiar maquinaria, el backend necesita lógica compleja.
-    // Por ahora, el usuario pidió editar, pero el backend lo limité.
-    // Voy a deshabilitar maquinaria en edición o mostrar advertencia.
-    // O mejor, solo permito editar fecha y observaciones como planeé en backend.
-
-    this.form.reset({
+    this.form.patchValue({
       fechaAsignacion: fecha,
       empleado: (asignacion.empleado as Empleado)._id || (asignacion.empleado as Empleado).id,
-      maquinaria: maquinariaIds,
-      obra: asignacion.obra ? (asignacion.obra._id || asignacion.obra.id || asignacion.obra) : '',
-      observaciones: asignacion.observaciones || ''
+      obra: asignacion.obra ? (asignacion.obra._id || asignacion.obra.id || asignacion.obra) : ''
     });
-
-    // Deshabilitar controles que no se pueden cambiar fácilmente sin lógica compleja de backend
-    this.form.get('empleado')?.disable();
-    this.form.get('maquinaria')?.disable();
 
     this.showModal = true;
     this.errorMessage = '';
@@ -205,6 +210,7 @@ export class Asignaciones implements OnInit, AfterViewInit {
     this.showModal = false;
     this.showReturnModal = false;
     this.form.reset();
+    this.maquinariaFormArray.clear();
     this.returnForm.reset();
     this.errorMessage = '';
     this.form.enable(); // Re-habilitar por si estaba en modo edición
@@ -313,7 +319,11 @@ export class Asignaciones implements OnInit, AfterViewInit {
 
   getMaquinariaNombres(asignacion: Asignacion): string {
     if (!asignacion.maquinaria || !Array.isArray(asignacion.maquinaria)) return '';
-    return asignacion.maquinaria.map((m: any) => m.nombre).join(', ');
+    return asignacion.maquinaria.map((m: any) => {
+      const nombre = m.item?.nombre || 'Desconocido';
+      const cantidad = m.cantidad || 1;
+      return `${nombre} (${cantidad})`;
+    }).join(', ');
   }
 
   getEmpleadoNombre(asignacion: Asignacion): string {
@@ -386,11 +396,16 @@ export class Asignaciones implements OnInit, AfterViewInit {
           doc.text(this.getObraNombre(asignacion), 60, 62);
 
           // Table
-          const machineryData = (asignacion.maquinaria as any[]).map(m => [m.codigo, m.nombre]);
+          const machineryData = (asignacion.maquinaria as any[]).map(m => [
+            m.item?.codigo || '-',
+            m.item?.nombre || '-',
+            m.cantidad || 1,
+            m.observaciones || '-'
+          ]);
 
           (autoTable as any).default(doc, {
             startY: 70,
-            head: [['CÓDIGO', 'DESCRIPCIÓN']],
+            head: [['CÓDIGO', 'DESCRIPCIÓN', 'CANTIDAD', 'OBSERVACIONES']],
             body: machineryData,
             theme: 'grid',
             headStyles: { fillColor: [44, 62, 80], textColor: 255 },

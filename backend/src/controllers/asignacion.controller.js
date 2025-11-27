@@ -6,7 +6,7 @@ export const getAsignaciones = async (req, res) => {
     try {
         const asignaciones = await Asignacion.find()
             .populate('empleado', 'nombre')
-            .populate('maquinaria', 'nombre codigo tipo')
+            .populate('maquinaria.item', 'nombre codigo tipo')
             .populate('obra', 'nombre_obra numero_contrato')
             .sort({ createdAt: -1 });
         return sendSuccess(res, 'Asignaciones obtenidas exitosamente', asignaciones);
@@ -18,15 +18,18 @@ export const getAsignaciones = async (req, res) => {
 
 export const createAsignacion = async (req, res) => {
     try {
-        const { empleado, maquinaria, fechaAsignacion, observaciones, obra } = req.body;
+        const { empleado, maquinaria, fechaAsignacion, obra } = req.body;
 
         if (!empleado || !maquinaria || !maquinaria.length || !fechaAsignacion) {
             return sendBadRequest(res, 'Empleado, maquinaria y fecha de asignación son requeridos');
         }
 
+        // Extract IDs for availability check
+        const maquinariaIds = maquinaria.map(m => m.item);
+
         // Verificar que la maquinaria esté disponible (estado 'Alta')
         const maquinariaItems = await MaquinariaEquipo.find({
-            _id: { $in: maquinaria }
+            _id: { $in: maquinariaIds }
         });
 
         const noDisponibles = maquinariaItems.filter(item => item.estado !== 'Alta');
@@ -36,24 +39,28 @@ export const createAsignacion = async (req, res) => {
         }
 
         // Crear asignación
-        const newAsignacion = await Asignacion.create({
+        const asignacionData = {
             empleado,
-            maquinaria,
+            maquinaria, // Array of { item, cantidad, observaciones }
             fechaAsignacion,
-            observaciones,
-            obra,
             estado: 'Activo'
-        });
+        };
+
+        if (obra) {
+            asignacionData.obra = obra;
+        }
+
+        const newAsignacion = await Asignacion.create(asignacionData);
 
         // Actualizar estado de maquinaria a 'Asignado'
         await MaquinariaEquipo.updateMany(
-            { _id: { $in: maquinaria } },
+            { _id: { $in: maquinariaIds } },
             { estado: 'Asignado' }
         );
 
         const populatedAsignacion = await Asignacion.findById(newAsignacion._id)
             .populate('empleado', 'nombre')
-            .populate('maquinaria', 'nombre codigo tipo')
+            .populate('maquinaria.item', 'nombre codigo tipo')
             .populate('obra', 'nombre_obra numero_contrato');
 
         return sendCreated(res, 'Asignación creada exitosamente', populatedAsignacion);
@@ -86,9 +93,12 @@ export const returnAsignacion = async (req, res) => {
         asignacion.estado = 'Finalizado';
         await asignacion.save();
 
+        // Extract IDs to update status
+        const maquinariaIds = asignacion.maquinaria.map(m => m.item);
+
         // Actualizar estado de maquinaria a 'Alta'
         await MaquinariaEquipo.updateMany(
-            { _id: { $in: asignacion.maquinaria } },
+            { _id: { $in: maquinariaIds } },
             { estado: 'Alta' }
         );
 
@@ -101,30 +111,79 @@ export const returnAsignacion = async (req, res) => {
 
 export const updateAsignacion = async (req, res) => {
     try {
-        // Por ahora solo permitiremos actualizar observaciones o fecha de asignación si no está finalizada
-        // Cambiar maquinaria es complejo porque implica revertir estados.
-        // Para simplificar, si quieren cambiar maquinaria, mejor que borren y creen otra o devuelvan.
-        // Pero el usuario pidió editar. Vamos a permitir editar campos simples.
-
-        const { fechaAsignacion, observaciones, obra } = req.body;
+        const { fechaAsignacion, obra, empleado, maquinaria } = req.body;
         const updateData = {};
-        if (fechaAsignacion) updateData.fechaAsignacion = fechaAsignacion;
-        if (observaciones !== undefined) updateData.observaciones = observaciones;
-        if (obra !== undefined) updateData.obra = obra;
 
-        const asignacion = await Asignacion.findByIdAndUpdate(
-            req.params.id,
-            updateData,
-            { new: true }
-        ).populate('empleado', 'nombre')
-            .populate('maquinaria', 'nombre codigo tipo')
-            .populate('obra', 'nombre_obra numero_contrato');
+        if (fechaAsignacion) updateData.fechaAsignacion = fechaAsignacion;
+        if (obra !== undefined) updateData.obra = obra || null;
+        if (empleado) updateData.empleado = empleado;
+
+        const asignacion = await Asignacion.findById(req.params.id);
 
         if (!asignacion) {
             return sendNotFound(res, 'Asignación no encontrada');
         }
 
-        return sendSuccess(res, 'Asignación actualizada exitosamente', asignacion);
+        if (asignacion.estado === 'Finalizado') {
+            return sendBadRequest(res, 'No se puede editar una asignación finalizada');
+        }
+
+        // Handle Maquinaria Update
+        if (maquinaria && Array.isArray(maquinaria)) {
+            // 1. Revert status of OLD machinery to 'Alta'
+            const oldMaquinariaIds = asignacion.maquinaria.map(m => m.item);
+            await MaquinariaEquipo.updateMany(
+                { _id: { $in: oldMaquinariaIds } },
+                { estado: 'Alta' }
+            );
+
+            // 2. Check availability of NEW machinery
+            const newMaquinariaIds = maquinaria.map(m => m.item);
+            const maquinariaItems = await MaquinariaEquipo.find({
+                _id: { $in: newMaquinariaIds }
+            });
+
+            const noDisponibles = maquinariaItems.filter(item => item.estado !== 'Alta');
+
+            // If any is not available, revert the revert? Or just fail?
+            // If we fail here, we must re-assign the old ones back to 'Asignado' to restore state.
+            if (noDisponibles.length > 0) {
+                // Restore old status
+                await MaquinariaEquipo.updateMany(
+                    { _id: { $in: oldMaquinariaIds } },
+                    { estado: 'Asignado' }
+                );
+                const nombres = noDisponibles.map(item => item.nombre).join(', ');
+                return sendBadRequest(res, `Los siguientes equipos no están disponibles: ${nombres}`);
+            }
+
+            // 3. Update assignment data
+            updateData.maquinaria = maquinaria;
+
+            // 4. Set status of NEW machinery to 'Asignado'
+            // We do this AFTER saving the assignment successfully, or here if we are sure.
+            // Let's do it here, if assignment save fails, we have a problem. 
+            // Better: Update assignment first, then update status.
+        }
+
+        const updatedAsignacion = await Asignacion.findByIdAndUpdate(
+            req.params.id,
+            updateData,
+            { new: true }
+        ).populate('empleado', 'nombre')
+            .populate('maquinaria.item', 'nombre codigo tipo')
+            .populate('obra', 'nombre_obra numero_contrato');
+
+        // If machinery was updated, set new status to 'Asignado'
+        if (maquinaria && Array.isArray(maquinaria)) {
+            const newMaquinariaIds = maquinaria.map(m => m.item);
+            await MaquinariaEquipo.updateMany(
+                { _id: { $in: newMaquinariaIds } },
+                { estado: 'Asignado' }
+            );
+        }
+
+        return sendSuccess(res, 'Asignación actualizada exitosamente', updatedAsignacion);
     } catch (error) {
         console.error('Error al actualizar asignación:', error);
         return sendError(res, 'Error al actualizar asignación', { error: error.message });

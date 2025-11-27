@@ -69,7 +69,6 @@ export class ObrasComponent implements OnInit, AfterViewInit {
                 this.obras = data;
                 this.dataSource.data = data;
                 this.isLoading = false;
-                console.log(this.obras)
                 // Re-asignar paginator y sort si es necesario
                 setTimeout(() => {
                     if (this.paginator) this.dataSource.paginator = this.paginator;
