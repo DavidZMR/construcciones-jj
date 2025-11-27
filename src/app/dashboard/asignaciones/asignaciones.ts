@@ -121,7 +121,7 @@ export class Asignaciones implements OnInit, AfterViewInit {
     // Cargar maquinaria disponible
     this.maquinariaService.getAll().subscribe({
       next: (data) => {
-        this.maquinaria = data.sort((a, b) => a.nombre.localeCompare(b.nombre));
+        this.maquinaria = data.sort((a, b) => a.nombre.localeCompare(b.nombre)).filter(o => o.estado !== 'Baja');
       }
     });
 
