@@ -407,41 +407,42 @@ export class Asignaciones implements OnInit, AfterViewInit {
           if (ctx) {
             ctx.drawImage(img, 0, 0);
             const pngDataUrl = canvas.toDataURL('image/png');
-            // Add logo as PNG (Wider to avoid deformation)
-            doc.addImage(pngDataUrl, 'PNG', 15, 10, 50, 20);
+            // Add logo as PNG (smaller size)
+            doc.addImage(pngDataUrl, 'PNG', 15, 10, 35, 14);
           }
 
-          // Header
-          doc.setFontSize(14);
-          doc.setFont('helvetica', 'bold');
-          doc.text('CONSTRUCCIONES J.J. S.A. DE C.V.', 70, 20);
+          // Header - Calibri Bold
+          doc.setFontSize(11);
+          doc.setFont('times', 'bold'); // jsPDF no tiene Calibri, usamos Times como alternativa
+          const pageWidth = doc.internal.pageSize.width;
+          doc.text('CONSTRUCCIONES J.J. S.A. DE C.V.', pageWidth / 2, 16, { align: 'center' });
 
-          doc.setFontSize(10);
-          doc.setFont('helvetica', 'normal');
-          doc.text('ASIGNACIÓN DE MAQUINARIA Y EQUIPO', 70, 28);
+          doc.setFontSize(11);
+          doc.setFont('times', 'normal'); // Calibri Light simulado con Times normal
+          doc.text('ASIGNACIÓN DE MAQUINARIA Y EQUIPO', pageWidth / 2, 23, { align: 'center' });
 
-
-          doc.setFontSize(10);
+          doc.setFontSize(11);
           doc.setTextColor(220, 53, 69); // Red color for folio
-          doc.text(`FOLIO: ${folio}`, 155, 30);
+          doc.text(`FOLIO: ${folio}`, 155, 16);
           doc.setTextColor(0, 0, 0); // Reset color
 
           // Info Section
-          doc.setFontSize(10);
-          doc.text(`FECHA: ${new Date(asignacion.fechaAsignacion).toLocaleDateString()}`, 155, 38);
+          doc.setFontSize(11);
+          doc.text(`FECHA: ${new Date(asignacion.fechaAsignacion).toLocaleDateString()}`, 155, 23);
 
           doc.setLineWidth(0.5);
-          doc.line(15, 45, 195, 45);
+          doc.line(15, 30, 195, 30);
 
-          doc.setFont('helvetica', 'bold');
-          doc.text('DATOS DEL EMPLEADO:', 15, 55);
-          doc.setFont('helvetica', 'normal');
-          doc.text((asignacion.empleado as any).nombre || '', 60, 55);
+          // Datos del empleado - Calibri Bold para títulos
+          doc.setFont('times', 'bold');
+          doc.text('DATOS DEL EMPLEADO:', 15, 38);
+          doc.setFont('times', 'normal');
+          doc.text((asignacion.empleado as any).nombre || '', 64, 38);
 
-          doc.setFont('helvetica', 'bold');
-          doc.text('OBRA:', 15, 62);
-          doc.setFont('helvetica', 'normal');
-          doc.text(this.getObraNombre(asignacion), 60, 62);
+          doc.setFont('times', 'bold');
+          doc.text('OBRA:', 15, 45);
+          doc.setFont('times', 'normal');
+          doc.text(this.getObraNombre(asignacion), 64, 45);
 
           // Table
           const machineryData = (asignacion.maquinaria as any[]).map(m => [
@@ -452,47 +453,72 @@ export class Asignaciones implements OnInit, AfterViewInit {
           ]);
 
           (autoTable as any).default(doc, {
-            startY: 70,
+            startY: 52,
             head: [['CÓDIGO', 'DESCRIPCIÓN', 'CANTIDAD', 'OBSERVACIONES']],
             body: machineryData,
             theme: 'grid',
-            headStyles: { fillColor: [44, 62, 80], textColor: 255 },
-            styles: { fontSize: 9 }
+            headStyles: {
+              fillColor: [200, 200, 200], // Gris
+              textColor: [0, 0, 0], // Negro
+              fontStyle: 'bold',
+              halign: 'center',
+              fontSize: 11
+            },
+            styles: {
+              fontSize: 11,
+              halign: 'center',
+              valign: 'middle'
+            },
+            columnStyles: {
+              1: { halign: 'left' }, // Descripción alineada a la izquierda
+              3: { halign: 'left' }  // Observaciones alineadas a la izquierda
+            }
           });
 
           const finalY = (doc as any).lastAutoTable.finalY + 10;
 
-          // Legal Text
-          doc.setFontSize(8);
+          // Legal Text - Justificado
+          doc.setFontSize(11);
+          doc.setFont('times', 'normal');
           const legalText = "ESTOY DE ACUERDO EN DEVOLVER EL EQUIPO DE PROTECCIÓN PERSONAL, HERRAMIENTA Y MAQUINARIA EN BUENAS CONDICIONES, CONSIDERANDO EL DESGASTE POR USO RAZONABLE AL ALMACÉN DE CONSTRUCCIONES JJ UNA VEZ TERMINADOS MIS TRABAJOS CON DONDE LOS NECESITE. SI NO FUESE DE ESTA MANERA, ES DECIR, QUE DIERA MAL USO, LA EMPRESA DEBERÁ DESCONTAR DE MI SALARIO EL VALOR DE REPARACIÓN O EN SU CASO EL VALOR DE REPOSICIÓN. (ART. 110-1 LFT)";
 
           const splitText = doc.splitTextToSize(legalText, 180);
-          doc.text(splitText, 15, finalY);
+          doc.text(splitText, 15, finalY, { align: 'justify', maxWidth: 180 });
 
           // Signatures
           const signatureY = finalY + 40;
 
           doc.setLineWidth(0.2);
+          doc.setFont('times', 'normal');
+          doc.setFontSize(11);
+
           // Signature 1
           doc.line(20, signatureY, 70, signatureY);
-          doc.text('RECIBÍ DE CONFORMIDAD', 25, signatureY + 5);
-          doc.text((asignacion.empleado as any).nombre || '', 25, signatureY + 10);
+          doc.text('RECIBÍ DE CONFORMIDAD', 45, signatureY + 5, { align: 'center' });
+          doc.text((asignacion.empleado as any).nombre || '', 45, signatureY + 10, { align: 'center' });
 
           // Signature 2
           doc.line(80, signatureY, 130, signatureY);
-          doc.text('COORDINADOR DE ALMACÉN', 85, signatureY + 5);
+          doc.text('COORDINADOR DE ALMACÉN', 105, signatureY + 5, { align: 'center' });
 
           // Signature 3
           doc.line(140, signatureY, 190, signatureY);
-          doc.text('VIGILANCIA', 155, signatureY + 5);
+          doc.text('VIGILANCIA', 165, signatureY + 5, { align: 'center' });
 
           // Footer
           const pageHeight = doc.internal.pageSize.height;
-          doc.setFontSize(6);
+          doc.setFontSize(11);
           doc.setTextColor(100, 100, 100);
-          const footerText = "ESTE DOCUMENTO CONTIENE INFORMACIÓN PROPIEDAD DE CONSTRUCCIONES J.J. S.A. DE C.V. DE C.V. CONSIDERADA DE USO INTERNO. CUALQUIER DISTRIBUCION O REPRODUCCIÓN SERÁ BAJO AUTORIZACIÓN ESPECÍFICA.";
+
+          // Número de formato a la derecha
+          doc.setFont('times', 'bold');
+          doc.text('F-610-7.1', 194, pageHeight - 15, { align: 'right' });
+
+          // Texto legal
+          doc.setFont('times', 'normal');
+          const footerText = "ESTE DOCUMENTO CONTIENE INFORMACIÓN PROPIEDAD DE CONSTRUCCIONES J.J. S.A. DE C.V. CONSIDERADA DE USO INTERNO. CUALQUIER DISTRIBUCION O REPRODUCCIÓN SERÁ BAJO AUTORIZACIÓN ESPECÍFICA.";
           const splitFooter = doc.splitTextToSize(footerText, 180);
-          doc.text(splitFooter, 15, pageHeight - 10);
+          doc.text(splitFooter, pageWidth / 2, pageHeight - 10, { align: 'center' });
 
           doc.save(`Asignacion_${folio}.pdf`);
         };
