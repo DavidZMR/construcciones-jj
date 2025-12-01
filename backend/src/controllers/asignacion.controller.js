@@ -24,18 +24,18 @@ export const createAsignacion = async (req, res) => {
             return sendBadRequest(res, 'Empleado, maquinaria y fecha de asignación son requeridos');
         }
 
-        // Extract IDs for availability check
+        // Extract IDs for validation
         const maquinariaIds = maquinaria.map(m => m.item);
 
-        // Verificar que la maquinaria esté disponible (estado 'Alta')
+        // Verificar que la maquinaria no esté dada de baja
         const maquinariaItems = await MaquinariaEquipo.find({
             _id: { $in: maquinariaIds }
         });
 
-        const noDisponibles = maquinariaItems.filter(item => item.estado !== 'Alta');
-        if (noDisponibles.length > 0) {
-            const nombres = noDisponibles.map(item => item.nombre).join(', ');
-            return sendBadRequest(res, `Los siguientes equipos no están disponibles: ${nombres}`);
+        const dadosDeBaja = maquinariaItems.filter(item => item.estado === 'Baja');
+        if (dadosDeBaja.length > 0) {
+            const nombres = dadosDeBaja.map(item => item.nombre).join(', ');
+            return sendBadRequest(res, `Los siguientes equipos están dados de baja: ${nombres}`);
         }
 
         // Crear asignación
@@ -72,10 +72,14 @@ export const createAsignacion = async (req, res) => {
 
 export const returnAsignacion = async (req, res) => {
     try {
-        const { fechaDevolucion } = req.body;
+        const { fechaDevolucion, itemsDevueltos } = req.body;
 
         if (!fechaDevolucion) {
             return sendBadRequest(res, 'La fecha de devolución es requerida');
+        }
+
+        if (!itemsDevueltos || !Array.isArray(itemsDevueltos) || itemsDevueltos.length === 0) {
+            return sendBadRequest(res, 'Debe especificar al menos un item para devolver');
         }
 
         const asignacion = await Asignacion.findById(req.params.id);
@@ -88,21 +92,79 @@ export const returnAsignacion = async (req, res) => {
             return sendBadRequest(res, 'Esta asignación ya ha sido finalizada');
         }
 
-        // Actualizar asignación
-        asignacion.fechaDevolucion = fechaDevolucion;
-        asignacion.estado = 'Finalizado';
-        await asignacion.save();
+        // Validar y procesar cada item devuelto
+        for (const itemDevuelto of itemsDevueltos) {
+            const { itemId, cantidadDevuelta } = itemDevuelto;
 
-        // Extract IDs to update status
-        const maquinariaIds = asignacion.maquinaria.map(m => m.item);
+            if (!itemId || !cantidadDevuelta || cantidadDevuelta <= 0) {
+                return sendBadRequest(res, 'Cada item debe tener un ID válido y una cantidad mayor a 0');
+            }
 
-        // Actualizar estado de maquinaria a 'Alta'
-        await MaquinariaEquipo.updateMany(
-            { _id: { $in: maquinariaIds } },
-            { estado: 'Alta' }
+            // Buscar el item en la asignación
+            const maquinariaItem = asignacion.maquinaria.find(
+                m => m.item.toString() === itemId.toString()
+            );
+
+            if (!maquinariaItem) {
+                return sendBadRequest(res, `El item ${itemId} no pertenece a esta asignación`);
+            }
+
+            // Validar que no se devuelva más de lo asignado
+            const cantidadPendiente = maquinariaItem.cantidad - (maquinariaItem.cantidadDevuelta || 0);
+
+            if (cantidadDevuelta > cantidadPendiente) {
+                return sendBadRequest(res, `No se puede devolver ${cantidadDevuelta} unidades. Solo hay ${cantidadPendiente} pendientes de devolución`);
+            }
+
+            // Actualizar cantidad devuelta
+            maquinariaItem.cantidadDevuelta = (maquinariaItem.cantidadDevuelta || 0) + cantidadDevuelta;
+
+            // Si se devolvió completamente, marcar fecha de devolución del item
+            if (maquinariaItem.cantidadDevuelta >= maquinariaItem.cantidad) {
+                maquinariaItem.fechaDevolucionItem = fechaDevolucion;
+            }
+        }
+
+        // Verificar si todos los items están completamente devueltos
+        const todosDevueltos = asignacion.maquinaria.every(
+            m => (m.cantidadDevuelta || 0) >= m.cantidad
         );
 
-        return sendSuccess(res, 'Asignación devuelta exitosamente', asignacion);
+        // Actualizar estado de la asignación
+        if (todosDevueltos) {
+            asignacion.estado = 'Finalizado';
+            asignacion.fechaDevolucion = fechaDevolucion;
+
+            // SOLO cuando la asignación se finaliza, verificar qué maquinaria puede regresar a 'Alta'
+            // Solo si NO está en ninguna otra asignación activa
+            const allMaquinariaIds = asignacion.maquinaria.map(m => m.item);
+
+            for (const maqId of allMaquinariaIds) {
+                // Buscar si este equipo está en otras asignaciones activas
+                const otrasAsignacionesActivas = await Asignacion.countDocuments({
+                    _id: { $ne: asignacion._id }, // Excluir la asignación actual
+                    'maquinaria.item': maqId,
+                    estado: 'Activo' // Solo asignaciones activas
+                });
+
+                // Si no hay otras asignaciones activas, cambiar a 'Alta'
+                if (otrasAsignacionesActivas === 0) {
+                    await MaquinariaEquipo.updateOne(
+                        { _id: maqId },
+                        { estado: 'Alta' }
+                    );
+                }
+            }
+        }
+
+        await asignacion.save();
+
+        const populatedAsignacion = await Asignacion.findById(asignacion._id)
+            .populate('empleado', 'nombre')
+            .populate('maquinaria.item', 'nombre codigo tipo')
+            .populate('obra', 'nombre_obra numero_contrato');
+
+        return sendSuccess(res, 'Devolución procesada exitosamente', populatedAsignacion);
     } catch (error) {
         console.error('Error al devolver asignación:', error);
         return sendError(res, 'Error al devolver asignación', { error: error.message });
@@ -130,40 +192,20 @@ export const updateAsignacion = async (req, res) => {
 
         // Handle Maquinaria Update
         if (maquinaria && Array.isArray(maquinaria)) {
-            // 1. Revert status of OLD machinery to 'Alta'
-            const oldMaquinariaIds = asignacion.maquinaria.map(m => m.item);
-            await MaquinariaEquipo.updateMany(
-                { _id: { $in: oldMaquinariaIds } },
-                { estado: 'Alta' }
-            );
-
-            // 2. Check availability of NEW machinery
+            // Verificar que la nueva maquinaria no esté dada de baja
             const newMaquinariaIds = maquinaria.map(m => m.item);
             const maquinariaItems = await MaquinariaEquipo.find({
                 _id: { $in: newMaquinariaIds }
             });
 
-            const noDisponibles = maquinariaItems.filter(item => item.estado !== 'Alta');
-
-            // If any is not available, revert the revert? Or just fail?
-            // If we fail here, we must re-assign the old ones back to 'Asignado' to restore state.
-            if (noDisponibles.length > 0) {
-                // Restore old status
-                await MaquinariaEquipo.updateMany(
-                    { _id: { $in: oldMaquinariaIds } },
-                    { estado: 'Asignado' }
-                );
-                const nombres = noDisponibles.map(item => item.nombre).join(', ');
-                return sendBadRequest(res, `Los siguientes equipos no están disponibles: ${nombres}`);
+            const dadosDeBaja = maquinariaItems.filter(item => item.estado === 'Baja');
+            if (dadosDeBaja.length > 0) {
+                const nombres = dadosDeBaja.map(item => item.nombre).join(', ');
+                return sendBadRequest(res, `Los siguientes equipos están dados de baja: ${nombres}`);
             }
 
-            // 3. Update assignment data
+            // Update assignment data
             updateData.maquinaria = maquinaria;
-
-            // 4. Set status of NEW machinery to 'Asignado'
-            // We do this AFTER saving the assignment successfully, or here if we are sure.
-            // Let's do it here, if assignment save fails, we have a problem. 
-            // Better: Update assignment first, then update status.
         }
 
         const updatedAsignacion = await Asignacion.findByIdAndUpdate(
@@ -174,9 +216,33 @@ export const updateAsignacion = async (req, res) => {
             .populate('maquinaria.item', 'nombre codigo tipo')
             .populate('obra', 'nombre_obra numero_contrato');
 
-        // If machinery was updated, set new status to 'Asignado'
+        // Si se actualizó la maquinaria, gestionar estados inteligentemente
         if (maquinaria && Array.isArray(maquinaria)) {
+            const oldMaquinariaIds = asignacion.maquinaria.map(m => m.item);
             const newMaquinariaIds = maquinaria.map(m => m.item);
+
+            // Para cada equipo antiguo, verificar si puede regresar a 'Alta'
+            for (const oldMaqId of oldMaquinariaIds) {
+                // Si el equipo ya no está en la nueva lista
+                if (!newMaquinariaIds.some(id => id.toString() === oldMaqId.toString())) {
+                    // Verificar si está en otras asignaciones activas
+                    const otrasAsignacionesActivas = await Asignacion.countDocuments({
+                        _id: { $ne: req.params.id },
+                        'maquinaria.item': oldMaqId,
+                        estado: 'Activo'
+                    });
+
+                    // Si no hay otras asignaciones activas, cambiar a 'Alta'
+                    if (otrasAsignacionesActivas === 0) {
+                        await MaquinariaEquipo.updateOne(
+                            { _id: oldMaqId },
+                            { estado: 'Alta' }
+                        );
+                    }
+                }
+            }
+
+            // Marcar la nueva maquinaria como 'Asignado'
             await MaquinariaEquipo.updateMany(
                 { _id: { $in: newMaquinariaIds } },
                 { estado: 'Asignado' }

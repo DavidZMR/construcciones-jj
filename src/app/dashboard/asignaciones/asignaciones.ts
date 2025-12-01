@@ -64,12 +64,17 @@ export class Asignaciones implements OnInit, AfterViewInit {
     });
 
     this.returnForm = this.fb.group({
-      fechaDevolucion: ['', Validators.required]
+      fechaDevolucion: ['', Validators.required],
+      itemsDevueltos: this.fb.array([], Validators.required)
     });
   }
 
   get maquinariaFormArray() {
     return this.form.get('maquinaria') as FormArray;
+  }
+
+  get itemsDevueltosFormArray() {
+    return this.returnForm.get('itemsDevueltos') as FormArray;
   }
 
   ngOnInit(): void {
@@ -203,6 +208,24 @@ export class Asignaciones implements OnInit, AfterViewInit {
     this.returnForm.reset({
       fechaDevolucion: new Date().toISOString().split('T')[0]
     });
+
+    // Inicializar array con items pendientes de devolución
+    this.itemsDevueltosFormArray.clear();
+    asignacion.maquinaria.forEach((m: any) => {
+      const cantidadPendiente = m.cantidad - (m.cantidadDevuelta || 0);
+      if (cantidadPendiente > 0) {
+        this.itemsDevueltosFormArray.push(this.fb.group({
+          itemId: [m.item._id || m.item.id],
+          nombre: [m.item.nombre],
+          cantidadTotal: [m.cantidad],
+          cantidadDevuelta: [m.cantidadDevuelta || 0],
+          cantidadPendiente: [cantidadPendiente],
+          cantidadADevolver: [cantidadPendiente, [Validators.min(1), Validators.max(cantidadPendiente)]],
+          seleccionado: [false]
+        }));
+      }
+    });
+
     this.showReturnModal = true;
   }
 
@@ -260,18 +283,31 @@ export class Asignaciones implements OnInit, AfterViewInit {
 
   saveReturn(): void {
     if (this.returnForm.valid && this.editingId) {
+      const itemsSeleccionados = this.itemsDevueltosFormArray.controls
+        .filter(ctrl => ctrl.get('seleccionado')?.value)
+        .map(ctrl => ({
+          itemId: ctrl.get('itemId')?.value,
+          cantidadDevuelta: ctrl.get('cantidadADevolver')?.value
+        }));
+
+      if (itemsSeleccionados.length === 0) {
+        this.errorMessage = 'Debe seleccionar al menos un item para devolver';
+        return;
+      }
+
       this.isLoading = true;
+      this.errorMessage = '';
       const fechaDevolucion = this.returnForm.get('fechaDevolucion')?.value;
 
-      this.asignacionService.returnAsignacion(this.editingId, fechaDevolucion).subscribe({
+      this.asignacionService.returnAsignacion(this.editingId, fechaDevolucion, itemsSeleccionados).subscribe({
         next: () => {
           this.loadData();
           this.closeModal();
-          Swal.fire('Éxito', 'Asignación devuelta correctamente', 'success');
+          Swal.fire('Éxito', 'Devolución procesada correctamente', 'success');
         },
         error: (error) => {
           this.isLoading = false;
-          this.errorMessage = error.message || 'Error al devolver asignación';
+          this.errorMessage = error.message || 'Error al procesar devolución';
           this.cdr.detectChanges();
         }
       });
@@ -329,6 +365,18 @@ export class Asignaciones implements OnInit, AfterViewInit {
   getEmpleadoNombre(asignacion: Asignacion): string {
     if (!asignacion.empleado) return '';
     return (asignacion.empleado as any).nombre || '';
+  }
+
+  getEstadoDevolucion(asignacion: Asignacion): string {
+    if (asignacion.estado === 'Finalizado') return 'Completado';
+
+    const totalItems = asignacion.maquinaria.length;
+    const itemsDevueltos = asignacion.maquinaria.filter((m: any) =>
+      (m.cantidadDevuelta || 0) >= m.cantidad
+    ).length;
+
+    if (itemsDevueltos === 0) return 'Activo';
+    return `Parcial (${itemsDevueltos}/${totalItems})`;
   }
 
   getObraNombre(asignacion: Asignacion): string {

@@ -18,6 +18,14 @@ const asignacionSchema = new mongoose.Schema({
             default: 1,
             min: [1, 'La cantidad debe ser mayor a 0']
         },
+        cantidadDevuelta: {
+            type: Number,
+            default: 0,
+            min: [0, 'La cantidad devuelta no puede ser negativa']
+        },
+        fechaDevolucionItem: {
+            type: Date
+        },
         observaciones: {
             type: String,
             trim: true

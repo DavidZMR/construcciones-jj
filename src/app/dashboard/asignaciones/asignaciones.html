@@ -79,9 +79,9 @@
 
         <td mat-cell *matCellDef="let item" class="actions-cell">
           @if(item.estado === 'Activo') {
-          <button class="btn-icon btn-edit" (click)="openEditModal(item)" title="Editar">
+          <!-- <button class="btn-icon btn-edit" (click)="openEditModal(item)" title="Editar">
             <img src="assets/icons/edit.svg" alt="Editar">
-          </button>
+          </button> -->
 
           <button class="btn-icon btn-delete" (click)="openReturnModal(item)" title="Devolver">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2f855a" stroke-width="2">
@@ -229,13 +229,18 @@
 <!-- Modal Devolver -->
 @if(showReturnModal) {
 <div class="modal-overlay" (click)="closeModal()">
-  <div class="modal-content" (click)="$event.stopPropagation()">
+  <div class="modal-content" style="max-width: 700px;" (click)="$event.stopPropagation()">
     <div class="modal-header">
-      <h2>Devolver Asignación</h2>
+      <h2>Devolver Maquinaria y Equipo</h2>
       <button class="modal-close" (click)="closeModal()">×</button>
     </div>
 
     <form [formGroup]="returnForm" (ngSubmit)="saveReturn()" class="modal-body">
+      @if(errorMessage) {
+      <div class="error-message">{{ errorMessage }}</div>
+      }
+
+      <!-- Fecha Devolución -->
       <div class="form-group">
         <label for="fechaDevolucion">Fecha de Devolución *</label>
         <input id="fechaDevolucion" type="date" formControlName="fechaDevolucion"
@@ -243,6 +248,46 @@
         @if(returnForm.get('fechaDevolucion')?.invalid && returnForm.get('fechaDevolucion')?.touched) {
         <span class="field-error">La fecha es requerida</span>
         }
+      </div>
+
+      <!-- Lista de Items -->
+      <div class="form-group">
+        <label>Seleccione los items a devolver:</label>
+
+        <div formArrayName="itemsDevueltos" style="max-height: 400px; overflow-y: auto;">
+          @for(item of itemsDevueltosFormArray.controls; track $index) {
+          <div [formGroupName]="$index"
+            style="border: 1px solid #e2e8f0; padding: 12px; margin-bottom: 10px; border-radius: 6px; background: #f8fafc;">
+
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+              <input type="checkbox" formControlName="seleccionado" style="width: 20px; height: 20px; cursor: pointer;">
+              <strong style="flex: 1;">{{ item.get('nombre')?.value }}</strong>
+            </div>
+
+            <div
+              style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; font-size: 0.9em; color: #64748b; margin-bottom: 8px;">
+              <div>
+                <span style="font-weight: 500;">Total:</span> {{ item.get('cantidadTotal')?.value }}
+              </div>
+              <div>
+                <span style="font-weight: 500;">Devuelto:</span> {{ item.get('cantidadDevuelta')?.value }}
+              </div>
+              <div>
+                <span style="font-weight: 500;">Pendiente:</span> {{ item.get('cantidadPendiente')?.value }}
+              </div>
+            </div>
+
+            @if(item.get('seleccionado')?.value) {
+            <div>
+              <label style="font-size: 0.85em; color: #64748b;">Cantidad a devolver:</label>
+              <input type="number" formControlName="cantidadADevolver" min="1"
+                [max]="item.get('cantidadPendiente')?.value"
+                style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">
+            </div>
+            }
+          </div>
+          }
+        </div>
       </div>
 
       <div class="modal-footer">

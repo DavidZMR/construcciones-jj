@@ -35,8 +35,11 @@ export class AsignacionService {
         );
     }
 
-    returnAsignacion(id: string, fechaDevolucion: string): Observable<Asignacion> {
-        return this.http.put<AsignacionResponse>(`${this.apiUrl}/asignaciones/${id}/devolver`, { fechaDevolucion }).pipe(
+    returnAsignacion(id: string, fechaDevolucion: string, itemsDevueltos: { itemId: string, cantidadDevuelta: number }[]): Observable<Asignacion> {
+        return this.http.put<AsignacionResponse>(`${this.apiUrl}/asignaciones/${id}/devolver`, {
+            fechaDevolucion,
+            itemsDevueltos
+        }).pipe(
             map(response => {
                 if (response.intCode === 200 && response.data) {
                     return response.data;
