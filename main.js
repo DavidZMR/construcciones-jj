@@ -57,6 +57,9 @@ function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1280,
         height: 800,
+        icon: app.isPackaged
+            ? path.join(__dirname, 'dist/construcciones-jj/browser/assets/icons/icon.ico')
+            : path.join(__dirname, 'src/assets/icons/icon.ico'),
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false
