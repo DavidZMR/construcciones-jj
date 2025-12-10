@@ -16,7 +16,7 @@ const maquinariaEquipoSchema = new mongoose.Schema({
         type: String,
         required: [true, 'El tipo es requerido'],
         enum: {
-            values: ['Vehiculo', 'Herramienta', 'Maquinaria'],
+            values: ['Vehículo', 'Herramienta', 'Maquinaria'],
             message: '{VALUE} no es un tipo válido'
         }
     },
@@ -42,7 +42,7 @@ const maquinariaEquipoSchema = new mongoose.Schema({
 
 // Validación personalizada para placa
 maquinariaEquipoSchema.pre('validate', function (next) {
-    if (this.tipo === 'Vehiculo' && !this.placa) {
+    if (this.tipo === 'Vehículo' && !this.placa) {
         this.invalidate('placa', 'La placa es requerida para vehículos');
     }
     next();

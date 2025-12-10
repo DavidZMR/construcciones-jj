@@ -57,7 +57,7 @@ export class MaquinariaEquipoComponent implements OnInit, AfterViewInit {
     // Suscribirse a cambios en el tipo para validar placa
     this.form.get('tipo')?.valueChanges.subscribe(value => {
       const placaControl = this.form.get('placa');
-      if (value === 'Vehiculo') {
+      if (value === 'Vehículo') {
         placaControl?.setValidators([Validators.required]);
       } else {
         placaControl?.clearValidators();

@@ -57,7 +57,7 @@
         <th mat-header-cell *matHeaderCellDef mat-sort-header>Tipo</th>
         <td mat-cell *matCellDef="let item">
           <span class="badge" [class.maquinaria]="item.tipo === 'Maquinaria'"
-            [class.herramienta]="item.tipo === 'Herramienta'" [class.vehiculo]="item.tipo === 'Vehiculo'">
+            [class.herramienta]="item.tipo === 'Herramienta'" [class.vehiculo]="item.tipo === 'Vehículo'">
             {{ item.tipo }}
           </span>
         </td>
@@ -141,7 +141,7 @@
         <select id="tipo" formControlName="tipo" [class.error]="form.get('tipo')?.invalid && form.get('tipo')?.touched">
           <option value="Herramienta">Herramienta</option>
           <option value="Maquinaria">Maquinaria</option>
-          <option value="Vehiculo">Vehículo</option>
+          <option value="Vehículo">Vehículo</option>
         </select>
       </div>
 
@@ -154,7 +154,7 @@
         </select>
       </div>
 
-      @if(form.get('tipo')?.value === 'Vehiculo') {
+      @if(form.get('tipo')?.value === 'Vehículo') {
       <div class="form-group">
         <label for="placa">Placa *</label>
         <input id="placa" type="text" formControlName="placa" placeholder="Placa del vehículo"

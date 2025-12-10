@@ -41,7 +41,7 @@ export const createMaquinaria = async (req, res) => {
         }
 
         // Validar placa si es vehículo
-        if (tipo === 'Vehiculo' && !placa) {
+        if (tipo === 'Vehículo' && !placa) {
             return sendBadRequest(res, 'La placa es requerida para vehículos');
         }
 
@@ -57,7 +57,7 @@ export const createMaquinaria = async (req, res) => {
             nombre,
             tipo,
             descripcion,
-            placa: tipo === 'Vehiculo' ? placa : undefined
+            placa: tipo === 'Vehículo' ? placa : undefined
         });
 
         return sendCreated(res, 'Elemento creado exitosamente', newItem);
@@ -84,14 +84,14 @@ export const updateMaquinaria = async (req, res) => {
         if (estado) updateData.estado = estado;
 
         // Manejo de placa
-        if (tipo === 'Vehiculo') {
+        if (tipo === 'Vehículo') {
             if (placa) updateData.placa = placa;
         } else if (tipo) {
             // Si cambiamos a un tipo que no es vehículo, eliminamos la placa
             updateData.placa = undefined;
             updateData.$unset = { placa: 1 }; // Para eliminar el campo de la BD
         } else if (placa !== undefined) {
-            // Si no cambiamos el tipo pero actualizamos la placa (solo si ya era vehiculo o no sabemos)
+            // Si no cambiamos el tipo pero actualizamos la placa (solo si ya era Vehículo o no sabemos)
             // Mejor confiamos en que el frontend manda todo o validamos contra el objeto actual
             updateData.placa = placa;
         }
