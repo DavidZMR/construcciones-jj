@@ -56,7 +56,8 @@
       <ng-container matColumnDef="tipo">
         <th mat-header-cell *matHeaderCellDef mat-sort-header>Tipo</th>
         <td mat-cell *matCellDef="let item">
-          <span class="badge" [class.maquinaria]="item.tipo === 'Maquinaria'" [class.herramienta]="item.tipo === 'Herramienta'" [class.vehiculo]="item.tipo === 'Vehiculo'">
+          <span class="badge" [class.maquinaria]="item.tipo === 'Maquinaria'"
+            [class.herramienta]="item.tipo === 'Herramienta'" [class.vehiculo]="item.tipo === 'Vehiculo'">
             {{ item.tipo }}
           </span>
         </td>
@@ -70,7 +71,8 @@
       <ng-container matColumnDef="estado">
         <th mat-header-cell *matHeaderCellDef mat-sort-header>Estado</th>
         <td mat-cell *matCellDef="let item">
-          <span class="badge" [class.alta]="item.estado === 'Alta'" [class.baja]="item.estado === 'Baja'" [class.asignado]="item.estado === 'Asignado'">
+          <span class="badge" [class.alta]="item.estado === 'Alta'" [class.baja]="item.estado === 'Baja'"
+            [class.asignado]="item.estado === 'Asignado'">
             {{ item.estado }}
           </span>
         </td>
@@ -80,18 +82,19 @@
         <th mat-header-cell *matHeaderCellDef mat-sort-header>Acciones</th>
         <td mat-cell *matCellDef="let item" class="actions-cell">
           <button class="btn-icon btn-edit" (click)="openEditModal(item)" title="Editar">
-              <img src="assets/icons/edit.svg" alt="">
-            </button>
-            
-            <button class="btn-icon btn-delete" (click)="delete(item)" title="Eliminar">
-              <img src="assets/icons/delete.svg" alt="">
-            </button>
+            <img src="assets/icons/edit.svg" alt="">
+          </button>
+
+          <button class="btn-icon btn-delete" (click)="delete(item)" title="Eliminar"
+            [disabled]="item.estado === 'Asignado'">
+            <img src="assets/icons/delete.svg" alt="">
+          </button>
         </td>
       </ng-container>
 
       <!-- Definiciones -->
       <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-      <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr> 
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
     </table>
 
     <mat-paginator [pageSize]="5" [pageSizeOptions]="[5, 10, 25]" showFirstLastButtons>
@@ -139,6 +142,15 @@
           <option value="Herramienta">Herramienta</option>
           <option value="Maquinaria">Maquinaria</option>
           <option value="Vehiculo">Vehículo</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="estado">Estado *</label>
+        <select id="estado" formControlName="estado"
+          [class.error]="form.get('estado')?.invalid && form.get('estado')?.touched">
+          <option value="Alta">Alta</option>
+          <option value="Baja">Baja</option>
         </select>
       </div>
 

@@ -74,13 +74,14 @@ export const createMaquinaria = async (req, res) => {
 
 export const updateMaquinaria = async (req, res) => {
     try {
-        const { codigo, nombre, tipo, descripcion, placa } = req.body;
+        const { codigo, nombre, tipo, descripcion, placa, estado } = req.body;
         const updateData = {};
 
         if (codigo) updateData.codigo = codigo;
         if (nombre) updateData.nombre = nombre;
         if (tipo) updateData.tipo = tipo;
         if (descripcion !== undefined) updateData.descripcion = descripcion;
+        if (estado) updateData.estado = estado;
 
         // Manejo de placa
         if (tipo === 'Vehiculo') {

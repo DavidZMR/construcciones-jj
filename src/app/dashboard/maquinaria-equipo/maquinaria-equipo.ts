@@ -50,7 +50,8 @@ export class MaquinariaEquipoComponent implements OnInit, AfterViewInit {
       nombre: ['', [Validators.required]],
       tipo: ['Herramienta', Validators.required],
       descripcion: [''],
-      placa: ['']
+      placa: [''],
+      estado: ['Alta', Validators.required]
     });
 
     // Suscribirse a cambios en el tipo para validar placa
@@ -112,8 +113,10 @@ export class MaquinariaEquipoComponent implements OnInit, AfterViewInit {
       nombre: '',
       tipo: 'Herramienta',
       descripcion: '',
-      placa: ''
+      placa: '',
+      estado: 'Alta'
     });
+    this.form.get('estado')?.enable();
     this.showModal = true;
     this.errorMessage = '';
     this.cdr.detectChanges();
@@ -127,8 +130,16 @@ export class MaquinariaEquipoComponent implements OnInit, AfterViewInit {
       nombre: item.nombre,
       tipo: item.tipo,
       descripcion: item.descripcion,
-      placa: item.placa
+      placa: item.placa,
+      estado: item.estado
     });
+
+    if (item.estado === 'Asignado') {
+      this.form.get('estado')?.disable();
+    } else {
+      this.form.get('estado')?.enable();
+    }
+
     this.showModal = true;
     this.errorMessage = '';
     this.cdr.detectChanges();
@@ -184,6 +195,11 @@ export class MaquinariaEquipoComponent implements OnInit, AfterViewInit {
   }
 
   delete(item: MaquinariaEquipo): void {
+    if (item.estado === 'Asignado') {
+      Swal.fire('Operación no permitida', 'No se puede dar de baja un elemento que se encuentra Asignado.', 'warning');
+      return;
+    }
+
     Swal.fire({
       title: 'Confirmar eliminación',
       text: `¿Estás seguro de que deseas eliminar ${item.nombre}?`,
