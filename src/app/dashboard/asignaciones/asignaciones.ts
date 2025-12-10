@@ -486,24 +486,46 @@ export class Asignaciones implements OnInit, AfterViewInit {
           doc.text(splitText, 15, finalY, { align: 'justify', maxWidth: 180 });
 
           // Signatures
-          const signatureY = finalY + 40;
+          // Calculate start Y. Ensure we have enough space, otherwise add page?
+          // For simplicity, we assume one page for now or autoTable handled breaks.
+          // We need about 60-70 units for 2 rows of signatures.
+
+          let signatureY = finalY + 50;
+
+          // Check if we are too close to bottom (A4 is ~297mm)
+          if (signatureY + 60 > 280) {
+            doc.addPage();
+            signatureY = 40;
+          }
 
           doc.setLineWidth(0.2);
           doc.setFont('times', 'normal');
           doc.setFontSize(11);
 
-          // Signature 1
-          doc.line(20, signatureY, 70, signatureY);
-          doc.text('RECIBÍ DE CONFORMIDAD', 45, signatureY + 5, { align: 'center' });
-          doc.text((asignacion.empleado as any).nombre || '', 45, signatureY + 10, { align: 'center' });
+          // Row 1
+          // Signature 1: Recibí (Left)
+          doc.line(25, signatureY, 85, signatureY);
+          doc.text('RECIBÍ DE CONFORMIDAD', 55, signatureY + 5, { align: 'center' });
+          const nombreEmpleado = (asignacion.empleado as any).nombre || '';
+          // Truncate or split if too long? For now just print.
+          doc.setFontSize(10);
+          doc.text(nombreEmpleado, 55, signatureY + 10, { align: 'center' });
+          doc.setFontSize(11);
 
-          // Signature 2
-          doc.line(80, signatureY, 130, signatureY);
-          doc.text('COORDINADOR DE ALMACÉN', 105, signatureY + 5, { align: 'center' });
+          // Signature 2: Coordinador (Right)
+          doc.line(125, signatureY, 185, signatureY);
+          doc.text('COORDINADOR DE ALMACÉN', 155, signatureY + 5, { align: 'center' });
 
-          // Signature 3
-          doc.line(140, signatureY, 190, signatureY);
-          doc.text('VIGILANCIA', 165, signatureY + 5, { align: 'center' });
+          // Row 2
+          const signatureY2 = signatureY + 35;
+
+          // Signature 3: Vigilancia (Left)
+          doc.line(25, signatureY2, 85, signatureY2);
+          doc.text('VIGILANCIA', 55, signatureY2 + 5, { align: 'center' });
+
+          // Signature 4: Chofer (Right)
+          doc.line(125, signatureY2, 185, signatureY2);
+          doc.text('CHOFER', 155, signatureY2 + 5, { align: 'center' });
 
           // Footer
           const pageHeight = doc.internal.pageSize.height;
