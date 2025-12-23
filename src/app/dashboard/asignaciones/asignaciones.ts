@@ -10,6 +10,8 @@ import Swal from 'sweetalert2';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
 import { MatSort, MatSortModule } from '@angular/material/sort';
+import { MatSelectModule } from '@angular/material/select';
+import { MatFormFieldModule } from '@angular/material/form-field';
 
 @Component({
   selector: 'app-asignaciones',
@@ -18,7 +20,9 @@ import { MatSort, MatSortModule } from '@angular/material/sort';
     ReactiveFormsModule,
     MatTableModule,
     MatPaginatorModule,
-    MatSortModule
+    MatSortModule,
+    MatSelectModule,
+    MatFormFieldModule
   ],
   templateUrl: './asignaciones.html',
   styleUrl: './asignaciones.scss',
@@ -32,11 +36,13 @@ export class Asignaciones implements OnInit, AfterViewInit {
   isLoading = false;
   showModal = false;
   showReturnModal = false;
+  showReportModal = false;
   isEditing = false;
   editingId: string | null = null;
 
   form: FormGroup;
   returnForm: FormGroup;
+  reportForm: FormGroup;
   errorMessage = '';
 
   generalFilter = ''
@@ -66,6 +72,10 @@ export class Asignaciones implements OnInit, AfterViewInit {
     this.returnForm = this.fb.group({
       fechaDevolucion: ['', Validators.required],
       itemsDevueltos: this.fb.array([], Validators.required)
+    });
+
+    this.reportForm = this.fb.group({
+      machineryEquipment: [[], Validators.required]
     });
   }
 
@@ -149,6 +159,7 @@ export class Asignaciones implements OnInit, AfterViewInit {
 
   removeMaquinariaItem(index: number) {
     this.maquinariaFormArray.removeAt(index);
+    this.cdr.detectChanges();
   }
 
   openCreateModal(): void {
@@ -177,13 +188,15 @@ export class Asignaciones implements OnInit, AfterViewInit {
     this.isEditing = true;
     this.editingId = asignacion._id || asignacion.id || null;
 
+    // Recargar catálogos para tener disponibilidad más reciente
+    this.loadCatalogos();
+
     // Formatear fecha para input date
     const fecha = asignacion.fechaAsignacion ? new Date(asignacion.fechaAsignacion).toISOString().split('T')[0] : '';
 
     this.maquinariaFormArray.clear();
     if (asignacion.maquinaria && Array.isArray(asignacion.maquinaria)) {
       asignacion.maquinaria.forEach((m: any) => {
-        // Handle both populated object and ID (though it should be populated)
         const itemId = m.item && (m.item._id || m.item.id) ? (m.item._id || m.item.id) : m.item;
         this.addMaquinariaItem({
           item: itemId,
@@ -193,10 +206,17 @@ export class Asignaciones implements OnInit, AfterViewInit {
       });
     }
 
+    // Extraer IDs de forma segura
+    const empleadoId = typeof asignacion.empleado === 'object' ?
+      (asignacion.empleado._id || asignacion.empleado.id) : asignacion.empleado;
+
+    const obraId = asignacion.obra ?
+      (typeof asignacion.obra === 'object' ? (asignacion.obra._id || asignacion.obra.id) : asignacion.obra) : '';
+
     this.form.patchValue({
       fechaAsignacion: fecha,
-      empleado: (asignacion.empleado as Empleado)._id || (asignacion.empleado as Empleado).id,
-      obra: asignacion.obra ? (asignacion.obra._id || asignacion.obra.id || asignacion.obra) : ''
+      empleado: empleadoId,
+      obra: obraId
     });
 
     this.showModal = true;
@@ -232,11 +252,117 @@ export class Asignaciones implements OnInit, AfterViewInit {
   closeModal(): void {
     this.showModal = false;
     this.showReturnModal = false;
+    this.showReportModal = false;
     this.form.reset();
     this.maquinariaFormArray.clear();
     this.returnForm.reset();
+    this.reportForm.reset();
     this.errorMessage = '';
     this.form.enable(); // Re-habilitar por si estaba en modo edición
+  }
+
+  assignedMachinery: any[] = [];
+
+  openReportModal(): void {
+    this.loadAssignedMachinery();
+    this.reportForm.reset({ machineryEquipment: [] });
+    this.showReportModal = true;
+    this.errorMessage = '';
+  }
+
+  loadAssignedMachinery(): void {
+    this.asignacionService.getAssignedMachinery().subscribe({
+      next: (data) => {
+        this.assignedMachinery = data;
+      },
+      error: (error) => {
+        console.error('Error loading assigned machinery', error);
+        this.errorMessage = 'Error al cargar maquinaria asignada';
+      }
+    });
+  }
+
+  generateReportPDF(): void {
+    if (this.reportForm.valid) {
+      const selectedIds = this.reportForm.get('machineryEquipment')?.value;
+
+      if (!selectedIds || selectedIds.length === 0) {
+        this.errorMessage = 'Debe seleccionar al menos un equipo';
+        return;
+      }
+
+      const selectedItems = this.assignedMachinery.filter(item => selectedIds.includes(item.id));
+
+      import('jspdf').then(jsPDF => {
+        import('jspdf-autotable').then(autoTable => {
+          const doc = new jsPDF.default();
+
+          // Header
+          const now = new Date();
+          const docDate = now.toLocaleDateString();
+
+          const logoUrl = 'assets/images/logo.svg';
+          const img = new Image();
+          img.src = logoUrl;
+
+          const drawPDFContent = () => {
+            // Title
+            doc.setFontSize(14);
+            doc.setFont('times', 'bold');
+            const pageWidth = doc.internal.pageSize.width;
+            doc.text('Maquinaria y equipo asignados', pageWidth / 2, 20, { align: 'center' });
+
+            doc.setFontSize(10);
+            doc.setFont('times', 'normal');
+            doc.text(`Fecha: ${docDate}`, pageWidth - 15, 20, { align: 'right' });
+
+            // Table
+            const body = selectedItems.map(item => [
+              item.code || '-',
+              item.name || '-',
+              item.assigned_to?.person_name || '-',
+              item.project?.project_name || 'Sin obra asignada'
+            ]);
+
+            (autoTable as any).default(doc, {
+              startY: 30,
+              head: [['Código', 'Nombre', 'Asignado a', 'Obra']],
+              body: body,
+              theme: 'grid',
+              headStyles: { fillColor: [220, 53, 69] }, // Brand color red? Or just standard grey
+              styles: { fontSize: 10 }
+            });
+
+            doc.save(`Reporte_Maquinaria_Asignada_${now.getTime()}.pdf`);
+            this.closeModal();
+            Swal.fire('Éxito', 'Reporte generado correctamente', 'success');
+          };
+
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(img, 0, 0);
+              const pngDataUrl = canvas.toDataURL('image/png');
+              doc.addImage(pngDataUrl, 'PNG', 15, 10, 30, 12); // Adjust logo position/size
+            }
+            drawPDFContent();
+          };
+
+          img.onerror = () => {
+            // Generated without logo
+            drawPDFContent();
+          };
+
+          // Trigger image load if not cached, otherwise it might be instant
+          if (img.complete) {
+            img.onload!(new Event('load'));
+          }
+        });
+      });
+    }
   }
 
   saveAsignacion(): void {

@@ -62,6 +62,18 @@ export class AsignacionService {
         );
     }
 
+    getAssignedMachinery(): Observable<any[]> {
+        return this.http.get<ApiResponse>(`${this.apiUrl}/asignaciones/machinery-equipment`).pipe(
+            map(response => {
+                if (response.intCode === 200 && response.data) {
+                    return response.data;
+                }
+                throw new Error(response.message || 'Error al obtener maquinaria asignada');
+            }),
+            catchError(this.handleError)
+        );
+    }
+
     private handleError(error: HttpErrorResponse) {
         console.error('Error HTTP:', error);
         if (error.error && typeof error.error === 'object' && 'intCode' in error.error) {

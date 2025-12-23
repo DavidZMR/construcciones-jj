@@ -255,3 +255,46 @@ export const updateAsignacion = async (req, res) => {
         return sendError(res, 'Error al actualizar asignación', { error: error.message });
     }
 };
+
+export const getAssignedMachinery = async (req, res) => {
+    try {
+        const asignacionesActivas = await Asignacion.find({ estado: 'Activo' })
+            .populate('empleado', 'nombre')
+            .populate('obra', 'nombre_obra')
+            .populate('maquinaria.item', 'nombre codigo');
+
+        let assignedItems = [];
+
+        asignacionesActivas.forEach(asignacion => {
+            if (asignacion.maquinaria && Array.isArray(asignacion.maquinaria)) {
+                asignacion.maquinaria.forEach(m => {
+                    // Calculamos cantidad pendiente para saber si sigue asignada
+                    const cantidadPendiente = m.cantidad - (m.cantidadDevuelta || 0);
+
+                    // Si hay items pendientes y el item existe (no es null)
+                    if (cantidadPendiente > 0 && m.item) {
+                        assignedItems.push({
+                            id: m.item._id,
+                            code: m.item.codigo,
+                            name: m.item.nombre,
+                            quantity: cantidadPendiente,
+                            assigned_to: {
+                                person_id: asignacion.empleado?._id,
+                                person_name: asignacion.empleado?.nombre || 'Desconocido'
+                            },
+                            project: {
+                                project_id: asignacion.obra?._id,
+                                project_name: asignacion.obra?.nombre_obra || 'Sin obra asignada'
+                            }
+                        });
+                    }
+                });
+            }
+        });
+
+        return sendSuccess(res, 'Maquinaria asignada obtenida exitosamente', assignedItems);
+    } catch (error) {
+        console.error('Error al obtener maquinaria asignada:', error);
+        return sendError(res, 'Error al obtener maquinaria asignada', { error: error.message });
+    }
+};

@@ -8,6 +8,16 @@
       </svg>
       Nueva Asignación
     </button>
+    <button class="btn-primary" (click)="openReportModal()" style="margin-left: 10px;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+        <polyline points="14 2 14 8 20 8"></polyline>
+        <line x1="16" y1="13" x2="8" y2="13"></line>
+        <line x1="16" y1="17" x2="8" y2="17"></line>
+        <polyline points="10 9 9 9 8 9"></polyline>
+      </svg>
+      Reporte
+    </button>
   </div>
 
   @if(isLoading && !showModal && !showReturnModal) {
@@ -79,9 +89,12 @@
 
         <td mat-cell *matCellDef="let item" class="actions-cell">
           @if(item.estado === 'Activo') {
-          <!-- <button class="btn-icon btn-edit" (click)="openEditModal(item)" title="Editar">
-            <img src="assets/icons/edit.svg" alt="Editar">
-          </button> -->
+          <button class="btn-icon btn-edit" (click)="openEditModal(item)" title="Editar">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2b6cb0" stroke-width="2">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+            </svg>
+          </button>
 
           <button class="btn-icon btn-delete" (click)="openReturnModal(item)" title="Devolver">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2f855a" stroke-width="2">
@@ -166,13 +179,11 @@
       <div class="form-group">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
           <label>Maquinaria y Equipo *</label>
-          @if(!isEditing) {
           <button type="button" class="btn-secondary btn-sm" (click)="addMaquinariaItem()">+ Agregar Equipo</button>
-          }
         </div>
 
         <div formArrayName="maquinaria">
-          @for(item of maquinariaFormArray.controls; track $index) {
+          @for(item of maquinariaFormArray.controls; track item) {
           <div [formGroupName]="$index" class="maquinaria-item-row"
             style="border: 1px solid #e2e8f0; padding: 10px; margin-bottom: 10px; border-radius: 6px; background: #f8fafc;">
 
@@ -205,7 +216,7 @@
             </div>
 
             <!-- Remove Button -->
-            @if(!isEditing && maquinariaFormArray.length > 1) {
+            @if(maquinariaFormArray.length > 1) {
             <div style="text-align: right;">
               <button type="button" class="btn-danger btn-sm" (click)="removeMaquinariaItem($index)"
                 style="font-size: 0.8em; padding: 4px 8px;">Eliminar</button>
@@ -255,7 +266,7 @@
         <label>Seleccione los items a devolver:</label>
 
         <div formArrayName="itemsDevueltos" style="max-height: 400px; overflow-y: auto;">
-          @for(item of itemsDevueltosFormArray.controls; track $index) {
+          @for(item of itemsDevueltosFormArray.controls; track item) {
           <div [formGroupName]="$index"
             style="border: 1px solid #e2e8f0; padding: 12px; margin-bottom: 10px; border-radius: 6px; background: #f8fafc;">
 
@@ -294,6 +305,48 @@
         <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
         <button type="submit" class="btn-primary" [disabled]="isLoading || returnForm.invalid">
           {{ isLoading ? 'Procesando...' : 'Confirmar Devolución' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+}
+
+<!-- Modal Reporte -->
+@if(showReportModal) {
+<div class="modal-overlay" (click)="closeModal()">
+  <div class="modal-content" style="max-width: 600px;" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h2>Generar reporte de maquinaria y equipo</h2>
+      <button class="modal-close" (click)="closeModal()">×</button>
+    </div>
+
+    <form [formGroup]="reportForm" (ngSubmit)="generateReportPDF()" class="modal-body">
+      @if(errorMessage) {
+      <div class="error-message" style="color: #e53e3e; margin-bottom: 1rem;">{{ errorMessage }}</div>
+      }
+
+      <div class="form-group" style="margin-bottom: 20px;">
+        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Maquinaria y equipo asignados</label>
+        <mat-form-field appearance="outline" style="width: 100%;">
+          <mat-label>Seleccione equipo (pueden ser varios)</mat-label>
+          <mat-select formControlName="machineryEquipment" multiple>
+            @for(item of assignedMachinery; track item.id) {
+            <mat-option [value]="item.id">
+              <span style="font-weight: 500;">{{ item.code }}</span> - {{ item.name }}
+            </mat-option>
+            }
+            @if(assignedMachinery.length === 0) {
+            <mat-option disabled>No hay maquinaria asignada actualmente</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+        <button type="submit" class="btn-primary" [disabled]="isLoading || reportForm.invalid">
+          {{ isLoading ? 'Generando...' : 'Generar' }}
         </button>
       </div>
     </form>
