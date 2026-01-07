@@ -331,12 +331,12 @@
         <mat-form-field appearance="outline" style="width: 100%;">
           <mat-label>Seleccione equipo (pueden ser varios)</mat-label>
           <mat-select formControlName="machineryEquipment" multiple>
-            @for(item of assignedMachinery; track item.id) {
+            @for(item of uniqueAssignedMachinery; track item.id) {
             <mat-option [value]="item.id">
               <span style="font-weight: 500;">{{ item.code }}</span> - {{ item.name }}
             </mat-option>
             }
-            @if(assignedMachinery.length === 0) {
+            @if(uniqueAssignedMachinery.length === 0) {
             <mat-option disabled>No hay maquinaria asignada actualmente</mat-option>
             }
           </mat-select>

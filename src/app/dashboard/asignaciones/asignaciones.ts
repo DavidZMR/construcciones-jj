@@ -270,10 +270,20 @@ export class Asignaciones implements OnInit, AfterViewInit {
     this.errorMessage = '';
   }
 
+  uniqueAssignedMachinery: any[] = [];
+
   loadAssignedMachinery(): void {
     this.asignacionService.getAssignedMachinery().subscribe({
       next: (data) => {
-        this.assignedMachinery = data;
+        this.assignedMachinery = data.sort((a: any, b: any) => (a.name || '').localeCompare(b.name || ''));
+
+        // Filtrar duplicados por ID para el dropdown
+        const seen = new Set();
+        this.uniqueAssignedMachinery = this.assignedMachinery.filter(item => {
+          const duplicate = seen.has(item.id);
+          seen.add(item.id);
+          return !duplicate;
+        });
       },
       error: (error) => {
         console.error('Error loading assigned machinery', error);
@@ -321,12 +331,14 @@ export class Asignaciones implements OnInit, AfterViewInit {
               item.code || '-',
               item.name || '-',
               item.assigned_to?.person_name || '-',
-              item.project?.project_name || 'Sin obra asignada'
+              item.project?.project_name || 'Sin obra asignada',
+              item.assigned_quantity || 0,
+              item.returned_quantity || 0
             ]);
 
             (autoTable as any).default(doc, {
               startY: 30,
-              head: [['Código', 'Nombre', 'Asignado a', 'Obra']],
+              head: [['Código', 'Nombre', 'Asignado a', 'Obra', 'C. Asig.', 'C. Dev.']],
               body: body,
               theme: 'grid',
               headStyles: { fillColor: [220, 53, 69] }, // Brand color red? Or just standard grey

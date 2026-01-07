@@ -285,7 +285,9 @@ export const getAssignedMachinery = async (req, res) => {
                             project: {
                                 project_id: asignacion.obra?._id,
                                 project_name: asignacion.obra?.nombre_obra || 'Sin obra asignada'
-                            }
+                            },
+                            assigned_quantity: m.cantidad,
+                            returned_quantity: m.cantidadDevuelta || 0
                         });
                     }
                 });
