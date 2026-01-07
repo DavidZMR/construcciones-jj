@@ -100,18 +100,27 @@ export const returnAsignacion = async (req, res) => {
                 return sendBadRequest(res, 'Cada item debe tener un ID válido y una cantidad mayor a 0');
             }
 
-            // Buscar el item en la asignación
-            const maquinariaItem = asignacion.maquinaria.find(
+            // Buscar el item en la asignación - Priorizar items con pendiente
+            const matchingItems = asignacion.maquinaria.filter(
                 m => m.item.toString() === itemId.toString()
             );
 
-            if (!maquinariaItem) {
+            if (matchingItems.length === 0) {
                 return sendBadRequest(res, `El item ${itemId} no pertenece a esta asignación`);
+            }
+
+            // Buscar uno que tenga cantidad pendiente
+            let maquinariaItem = matchingItems.find(
+                m => (m.cantidad - (m.cantidadDevuelta || 0)) > 0
+            );
+
+            // Si todos están devueltos, tomar el primero para que el error de validación abajo lo reporte
+            if (!maquinariaItem) {
+                maquinariaItem = matchingItems[0];
             }
 
             // Validar que no se devuelva más de lo asignado
             const cantidadPendiente = maquinariaItem.cantidad - (maquinariaItem.cantidadDevuelta || 0);
-
             if (cantidadDevuelta > cantidadPendiente) {
                 return sendBadRequest(res, `No se puede devolver ${cantidadDevuelta} unidades. Solo hay ${cantidadPendiente} pendientes de devolución`);
             }

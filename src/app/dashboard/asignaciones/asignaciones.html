@@ -37,6 +37,15 @@
         <option value="Finalizado">Finalizado</option>
       </select>
     </div>
+    <div class="form-group search">
+      <label for="">Obra</label>
+      <select name="" id="" (change)="applyObraFilter($event)">
+        <option value="">Todas las obras</option>
+        @for(obra of obras; track obra._id) {
+        <option [value]="obra._id || obra.id">{{ obra.nombre_obra }}</option>
+        }
+      </select>
+    </div>
   </div>
   <div class="table-container">
     <table mat-table [dataSource]="dataSource" matSort class="mat-elevation-z2">

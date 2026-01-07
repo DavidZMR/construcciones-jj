@@ -47,12 +47,23 @@ export class Asignaciones implements OnInit, AfterViewInit {
 
   generalFilter = ''
   strStatus = ''
+  strObra = ''
 
   displayedColumns: string[] = ['fechaAsignacion', 'empleado', 'obra', 'maquinaria', 'estado', 'fechaDevolucion', 'acciones'];
   dataSource = new MatTableDataSource<Asignacion>();
 
-  @ViewChild(MatPaginator) paginator!: MatPaginator;
-  @ViewChild(MatSort) sort!: MatSort;
+  @ViewChild(MatPaginator) set matPaginator(mp: MatPaginator) {
+    this.paginator = mp;
+    this.dataSource.paginator = this.paginator;
+  }
+
+  @ViewChild(MatSort) set matSort(ms: MatSort) {
+    this.sort = ms;
+    this.dataSource.sort = this.sort;
+  }
+
+  paginator!: MatPaginator;
+  sort!: MatSort;
 
   constructor(
     private fb: FormBuilder,
@@ -90,13 +101,21 @@ export class Asignaciones implements OnInit, AfterViewInit {
   ngOnInit(): void {
     this.loadData();
     this.loadCatalogos();
+
+    // Configurar sorting y filtering aquí para asegurar que estén listos
+    this.dataSource.sortingDataAccessor = (item: any, property: string) => {
+      switch (property) {
+        case 'empleado': return (item.empleado?.nombre || '').toLowerCase();
+        case 'obra': return (item.obra?.nombre_obra || '').toLowerCase();
+        default: return (item[property] || '').toString().toLowerCase();
+      }
+    };
+
+    this.dataSource.filterPredicate = this.customFilterPredicate();
   }
 
   ngAfterViewInit() {
-    this.dataSource.paginator = this.paginator;
-    this.dataSource.sort = this.sort;
-
-    this.dataSource.filterPredicate = this.customFilterPredicate();
+    // Ya no es necesario inicializar aquí gracias a los setters
   }
 
   loadData(): void {
@@ -106,14 +125,6 @@ export class Asignaciones implements OnInit, AfterViewInit {
         this.asignaciones = data;
         this.dataSource.data = data;
         this.isLoading = false;
-
-        setTimeout(() => {
-          this.dataSource.paginator = this.paginator;
-          this.dataSource.sort = this.sort;
-        });
-
-        this.dataSource.filterPredicate = this.customFilterPredicate();
-
         this.cdr.detectChanges();
       },
       error: (error) => {
@@ -459,6 +470,7 @@ export class Asignaciones implements OnInit, AfterViewInit {
     this.dataSource.filter = JSON.stringify({
       general: value,
       status: this.strStatus || "",
+      obra: this.strObra || ""
     });
   }
 
@@ -468,6 +480,17 @@ export class Asignaciones implements OnInit, AfterViewInit {
     this.dataSource.filter = JSON.stringify({
       general: this.generalFilter || "",
       status: value,
+      obra: this.strObra || ""
+    });
+  }
+
+  applyObraFilter(event: Event) {
+    const value = (event.target as HTMLSelectElement).value;
+    this.strObra = value;
+    this.dataSource.filter = JSON.stringify({
+      general: this.generalFilter || "",
+      status: this.strStatus || "",
+      obra: value
     });
   }
 
@@ -478,6 +501,8 @@ export class Asignaciones implements OnInit, AfterViewInit {
       const matchesStatus =
         !parsed.status || (data.estado && data.estado.toLowerCase().includes(parsed.status));
 
+      const obraId = data.obra && (data.obra._id || data.obra.id) ? (data.obra._id || data.obra.id) : '';
+      const matchesObra = !parsed.obra || obraId === parsed.obra;
 
       // Filtro general
       const matchesGeneral =
@@ -487,7 +512,7 @@ export class Asignaciones implements OnInit, AfterViewInit {
           .toLowerCase()
           .includes(parsed.general);
 
-      return matchesGeneral && matchesStatus;
+      return matchesGeneral && matchesStatus && matchesObra;
     };
   }
 
