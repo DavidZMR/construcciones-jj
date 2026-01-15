@@ -86,7 +86,9 @@ export class Asignaciones implements OnInit, AfterViewInit {
     });
 
     this.reportForm = this.fb.group({
-      machineryEquipment: [[], Validators.required]
+      machineryEquipment: [[]],
+      obra: [[]],
+      empleado: [[]]
     });
   }
 
@@ -276,7 +278,11 @@ export class Asignaciones implements OnInit, AfterViewInit {
 
   openReportModal(): void {
     this.loadAssignedMachinery();
-    this.reportForm.reset({ machineryEquipment: [] });
+    this.reportForm.reset({
+      machineryEquipment: [],
+      obra: [],
+      empleado: []
+    });
     this.showReportModal = true;
     this.errorMessage = '';
   }
@@ -305,14 +311,40 @@ export class Asignaciones implements OnInit, AfterViewInit {
 
   generateReportPDF(): void {
     if (this.reportForm.valid) {
-      const selectedIds = this.reportForm.get('machineryEquipment')?.value;
+      const selectedIds = this.reportForm.get('machineryEquipment')?.value || [];
+      const selectedObras = this.reportForm.get('obra')?.value || [];
+      const selectedEmpleados = this.reportForm.get('empleado')?.value || [];
 
-      if (!selectedIds || selectedIds.length === 0) {
-        this.errorMessage = 'Debe seleccionar al menos un equipo';
-        return;
+      // Validar que si no hay filtros, se advierta o se permita todo
+      // En este caso, "emptySelection: no aplicar ningún filtro" => Mostrar Todo
+      // Pero "si se selecciona, filtra solo...", AND logic
+
+      let selectedItems = this.assignedMachinery;
+      // Filter by Obra
+      if (selectedObras.length > 0) {
+        selectedItems = selectedItems.filter(item => {
+          const obraId = item.project ? item.project.project_id : null;
+          return selectedObras.includes(obraId);
+        });
       }
 
-      const selectedItems = this.assignedMachinery.filter(item => selectedIds.includes(item.id));
+      // Filter by Empleado
+      if (selectedEmpleados.length > 0) {
+        selectedItems = selectedItems.filter(item => {
+          const empId = item.assigned_to ? item.assigned_to.person_id : null;
+          return selectedEmpleados.includes(empId);
+        });
+      }
+
+      // Filter by Maquinaria (Specific Items)
+      if (selectedIds.length > 0) {
+        selectedItems = selectedItems.filter(item => selectedIds.includes(item.id));
+      }
+
+      if (selectedItems.length === 0) {
+        this.errorMessage = 'No se encontraron registros con los filtros seleccionados.';
+        return;
+      }
 
       import('jspdf').then(jsPDF => {
         import('jspdf-autotable').then(autoTable => {

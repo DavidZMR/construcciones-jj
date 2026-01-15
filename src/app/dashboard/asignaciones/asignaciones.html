@@ -335,10 +335,35 @@
       <div class="error-message" style="color: #e53e3e; margin-bottom: 1rem;">{{ errorMessage }}</div>
       }
 
-      <div class="form-group" style="margin-bottom: 20px;">
-        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Maquinaria y equipo asignados</label>
+      <div class="form-group" >
+        <label style="display: block; font-weight: 500;">Filtrar por Obra (Opcional)</label>
         <mat-form-field appearance="outline" style="width: 100%;">
-          <mat-label>Seleccione equipo (pueden ser varios)</mat-label>
+          <mat-label>Todas las obras</mat-label>
+          <mat-select formControlName="obra" multiple>
+            @for(obra of obras; track obra._id) {
+            <mat-option [value]="obra._id || obra.id">{{ obra.nombre_obra }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <div class="form-group" >
+        <label style="display: block;  font-weight: 500;">Filtrar por Empleado (Opcional)</label>
+        <mat-form-field appearance="outline" style="width: 100%;">
+          <mat-label>Todos los empleados</mat-label>
+          <mat-select formControlName="empleado" multiple>
+            @for(emp of empleados; track emp._id) {
+            <mat-option [value]="emp._id || emp.id">{{ emp.nombre }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <div class="form-group">
+        <label style="display: block; font-weight: 500;">Filtrar Maquinaria específica
+          (Opcional)</label>
+        <mat-form-field appearance="outline" style="width: 100%;">
+          <mat-label>Toda la maquinaria asignada</mat-label>
           <mat-select formControlName="machineryEquipment" multiple>
             @for(item of uniqueAssignedMachinery; track item.id) {
             <mat-option [value]="item.id">
