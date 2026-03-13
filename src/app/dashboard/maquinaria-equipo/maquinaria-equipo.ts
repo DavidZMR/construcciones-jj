@@ -24,10 +24,13 @@ export class MaquinariaEquipoComponent implements OnInit, AfterViewInit {
   items: MaquinariaEquipo[] = [];
   isLoading = false;
   showModal = false;
+  showReportModal = false;
   isEditing = false;
   editingItem: MaquinariaEquipo | null = null;
   form: FormGroup;
+  reportForm: FormGroup;
   errorMessage = '';
+  reportErrorMessage = '';
   strType = ''
   generalFilter = ''
   strStatus = ''
@@ -64,6 +67,12 @@ export class MaquinariaEquipoComponent implements OnInit, AfterViewInit {
         placaControl?.setValue('');
       }
       placaControl?.updateValueAndValidity();
+    });
+
+    this.reportForm = this.fb.group({
+      tipo: [''],
+      estado: [''],
+      search: ['']
     });
   }
 
@@ -281,4 +290,120 @@ export class MaquinariaEquipoComponent implements OnInit, AfterViewInit {
     };
   }
 
+  openReportModal(): void {
+    this.reportForm.reset({ tipo: '', estado: '', search: '' });
+    this.showReportModal = true;
+    this.reportErrorMessage = '';
+  }
+
+  closeReportModal(): void {
+    this.showReportModal = false;
+    this.reportForm.reset();
+    this.reportErrorMessage = '';
+  }
+
+  generateReportPDF(): void {
+    const fTipo = (this.reportForm.get('tipo')?.value || '');
+    const fEstado = (this.reportForm.get('estado')?.value || '');
+    const fSearch = (this.reportForm.get('search')?.value || '').toLowerCase();
+
+    let filtered = [...this.items];
+
+    if (fTipo) filtered = filtered.filter(i => i.tipo === fTipo);
+    if (fEstado) filtered = filtered.filter(i => i.estado === fEstado);
+    if (fSearch) {
+      filtered = filtered.filter(i =>
+        (i.codigo || '').toLowerCase().includes(fSearch) ||
+        (i.nombre || '').toLowerCase().includes(fSearch) ||
+        (i.placa || '').toLowerCase().includes(fSearch)
+      );
+    }
+
+    if (filtered.length === 0) {
+      this.reportErrorMessage = 'No se encontraron registros con los filtros seleccionados.';
+      return;
+    }
+
+    import('jspdf').then(jsPDF => {
+      import('jspdf-autotable').then(autoTable => {
+        const doc = new jsPDF.default();
+        const now = new Date();
+        const docDate = now.toLocaleDateString();
+
+        const logoUrl = 'assets/images/logo.svg';
+        const img = new Image();
+        img.src = logoUrl;
+
+        const drawPDFContent = () => {
+          const pageWidth = doc.internal.pageSize.width;
+
+          doc.setFontSize(14);
+          doc.setFont('times', 'bold');
+          doc.text('Reporte de Maquinaria y Equipo', pageWidth / 2, 20, { align: 'center' });
+
+          doc.setFontSize(10);
+          doc.setFont('times', 'normal');
+          doc.text(`Fecha: ${docDate}`, pageWidth - 15, 20, { align: 'right' });
+
+          let infoY = 28;
+          doc.setFontSize(9);
+          if (fTipo) { doc.text(`Tipo: ${fTipo}`, 15, infoY); infoY += 5; }
+          if (fEstado) { doc.text(`Estado: ${fEstado}`, 15, infoY); infoY += 5; }
+          if (fSearch) { doc.text(`Búsqueda: ${fSearch}`, 15, infoY); infoY += 5; }
+          doc.text(`Total: ${filtered.length} registro(s)`, 15, infoY);
+          infoY += 5;
+
+          const body = filtered.map(i => [
+            i.codigo || '-',
+            i.nombre || '-',
+            i.tipo || '-',
+            i.placa || '-',
+            i.estado || '-'
+          ]);
+
+          (autoTable as any).default(doc, {
+            startY: infoY + 3,
+            head: [['Código', 'Nombre', 'Tipo', 'Placa', 'Estado']],
+            body: body,
+            theme: 'grid',
+            headStyles: { fillColor: [220, 53, 69] },
+            styles: { fontSize: 10 }
+          });
+
+          doc.save(`Reporte_Maquinaria_${now.getTime()}.pdf`);
+          this.closeReportModal();
+          Swal.fire('Éxito', 'Reporte generado correctamente', 'success');
+        };
+
+        if (img.complete) {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0);
+            const pngDataUrl = canvas.toDataURL('image/png');
+            doc.addImage(pngDataUrl, 'PNG', 15, 10, 30, 12);
+          }
+          drawPDFContent();
+        } else {
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(img, 0, 0);
+              const pngDataUrl = canvas.toDataURL('image/png');
+              doc.addImage(pngDataUrl, 'PNG', 15, 10, 30, 12);
+            }
+            drawPDFContent();
+          };
+          img.onerror = () => {
+            drawPDFContent();
+          };
+        }
+      });
+    });
+  }
 }

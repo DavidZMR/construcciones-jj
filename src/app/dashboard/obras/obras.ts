@@ -24,10 +24,13 @@ export class ObrasComponent implements OnInit, AfterViewInit {
     obras: Obra[] = [];
     isLoading = false;
     showModal = false;
+    showReportModal = false;
     isEditing = false;
     editingId: string | null = null;
     form: FormGroup;
+    reportForm: FormGroup;
     errorMessage = '';
+    reportErrorMessage = '';
 
     generalFilter = '';
     strStatus = '';
@@ -49,6 +52,11 @@ export class ObrasComponent implements OnInit, AfterViewInit {
             numero_contrato: ['', Validators.required],
             nombre_obra: ['', Validators.required],
             estatus: ['ALTA', Validators.required]
+        });
+
+        this.reportForm = this.fb.group({
+            estatus: [''],
+            search: ['']
         });
     }
 
@@ -218,5 +226,116 @@ export class ObrasComponent implements OnInit, AfterViewInit {
 
             return matchesStatus && matchesGeneral;
         };
+    }
+
+    openReportModal(): void {
+        this.reportForm.reset({ estatus: '', search: '' });
+        this.showReportModal = true;
+        this.reportErrorMessage = '';
+    }
+
+    closeReportModal(): void {
+        this.showReportModal = false;
+        this.reportForm.reset();
+        this.reportErrorMessage = '';
+    }
+
+    generateReportPDF(): void {
+        const fEstatus = (this.reportForm.get('estatus')?.value || '');
+        const fSearch = (this.reportForm.get('search')?.value || '').toLowerCase();
+
+        let filtered = [...this.obras];
+
+        if (fEstatus) filtered = filtered.filter(o => o.estatus === fEstatus);
+        if (fSearch) {
+            filtered = filtered.filter(o =>
+                (o.numero_contrato || '').toLowerCase().includes(fSearch) ||
+                (o.nombre_obra || '').toLowerCase().includes(fSearch)
+            );
+        }
+
+        if (filtered.length === 0) {
+            this.reportErrorMessage = 'No se encontraron registros con los filtros seleccionados.';
+            return;
+        }
+
+        import('jspdf').then(jsPDF => {
+            import('jspdf-autotable').then(autoTable => {
+                const doc = new jsPDF.default();
+                const now = new Date();
+                const docDate = now.toLocaleDateString();
+
+                const logoUrl = 'assets/images/logo.svg';
+                const img = new Image();
+                img.src = logoUrl;
+
+                const drawPDFContent = () => {
+                    const pageWidth = doc.internal.pageSize.width;
+
+                    doc.setFontSize(14);
+                    doc.setFont('times', 'bold');
+                    doc.text('Reporte de Obras', pageWidth / 2, 20, { align: 'center' });
+
+                    doc.setFontSize(10);
+                    doc.setFont('times', 'normal');
+                    doc.text(`Fecha: ${docDate}`, pageWidth - 15, 20, { align: 'right' });
+
+                    let infoY = 28;
+                    doc.setFontSize(9);
+                    if (fEstatus) { doc.text(`Estatus: ${fEstatus}`, 15, infoY); infoY += 5; }
+                    if (fSearch) { doc.text(`Búsqueda: ${fSearch}`, 15, infoY); infoY += 5; }
+                    doc.text(`Total: ${filtered.length} obra(s)`, 15, infoY);
+                    infoY += 5;
+
+                    const body = filtered.map(o => [
+                        o.numero_contrato || '-',
+                        o.nombre_obra || '-',
+                        o.estatus || '-'
+                    ]);
+
+                    (autoTable as any).default(doc, {
+                        startY: infoY + 3,
+                        head: [['No. Contrato', 'Nombre de la Obra', 'Estatus']],
+                        body: body,
+                        theme: 'grid',
+                        headStyles: { fillColor: [220, 53, 69] },
+                        styles: { fontSize: 10 }
+                    });
+
+                    doc.save(`Reporte_Obras_${now.getTime()}.pdf`);
+                    this.closeReportModal();
+                    Swal.fire('Éxito', 'Reporte generado correctamente', 'success');
+                };
+
+                if (img.complete) {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    if (ctx) {
+                        ctx.drawImage(img, 0, 0);
+                        const pngDataUrl = canvas.toDataURL('image/png');
+                        doc.addImage(pngDataUrl, 'PNG', 15, 10, 30, 12);
+                    }
+                    drawPDFContent();
+                } else {
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        const ctx = canvas.getContext('2d');
+                        if (ctx) {
+                            ctx.drawImage(img, 0, 0);
+                            const pngDataUrl = canvas.toDataURL('image/png');
+                            doc.addImage(pngDataUrl, 'PNG', 15, 10, 30, 12);
+                        }
+                        drawPDFContent();
+                    };
+                    img.onerror = () => {
+                        drawPDFContent();
+                    };
+                }
+            });
+        });
     }
 }

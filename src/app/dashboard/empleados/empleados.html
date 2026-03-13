@@ -8,6 +8,16 @@
       </svg>
       Nuevo Empleado
     </button>
+    <button class="btn-primary" (click)="openReportModal()" style="margin-left: 10px;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+        <polyline points="14 2 14 8 20 8"></polyline>
+        <line x1="16" y1="13" x2="8" y2="13"></line>
+        <line x1="16" y1="17" x2="8" y2="17"></line>
+        <polyline points="10 9 9 9 8 9"></polyline>
+      </svg>
+      Reporte
+    </button>
   </div>
 
   @if(isLoading && !showModal) {
@@ -20,8 +30,8 @@
       <input placeholder="Buscar..." (keyup)="applyGeneralFilter($event)" class="search-input" />
     </div>
     <div class="form-group search">
-      <label for="">Tipo</label>
-      <select name="" id="" (change)="applyPuestoFilter($event)">
+      <label>Puesto</label>
+      <select (change)="applyPuestoFilter($event)">
         <option value="">Todos los puestos</option>
         @for(puesto of uniquePuestos; track puesto) {
         <option [value]="puesto">{{ puesto }}</option>
@@ -29,22 +39,35 @@
       </select>
     </div>
     <div class="form-group search">
-      <label for="">Área</label>
-      <select name="" id="" (change)="applyAreaFilter($event)">
-        <option value="">Todos las Área</option>
+      <label>Área</label>
+      <select (change)="applyAreaFilter($event)">
+        <option value="">Todas las áreas</option>
         @for(area of uniqueAreas; track area) {
         <option [value]="area">{{ area }}</option>
         }
       </select>
     </div>
     <div class="form-group search">
-      <label for="">Estado</label>
-      <select name="" id="" (change)="applyStatusFilter($event)">
-        <option value="">Todos los estados</option>
-        <option value="Alta">Alta</option>
-        <option value="Baja">Baja</option>
+      <label>Estatus</label>
+      <select (change)="applyStatusFilter($event)">
+        <option value="">Todos los estatus</option>
+        <option value="ALTA">Alta</option>
+        <option value="BAJA">Baja</option>
       </select>
     </div>
+    <div class="form-group search">
+      <label>Obra</label>
+      <select (change)="applyObraFilter($event)">
+        <option value="">Todas las obras</option>
+        <option value="__SIN_OBRA__">Sin obra asignada</option>
+        @for(obra of uniqueObras; track obra) {
+        <option [value]="obra">{{ obra }}</option>
+        }
+      </select>
+    </div>
+  </div>
+  <div class="total-info">
+    <span>Total empleados: <strong>{{ dataSource.filteredData.length }}</strong></span>
   </div>
   <div class="table-container">
     <table mat-table [dataSource]="dataSource" matSort class="mat-elevation-z2">
@@ -204,6 +227,76 @@
         <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
         <button type="submit" class="btn-primary" [disabled]="isLoading || form.invalid">
           {{ isLoading ? 'Guardando...' : (isEditing ? 'Actualizar' : 'Crear') }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+}
+
+<!-- Modal Reporte -->
+@if(showReportModal) {
+<div class="modal-overlay" (click)="closeReportModal()">
+  <div class="modal-content" style="max-width: 600px;" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h2>Generar reporte de empleados</h2>
+      <button class="modal-close" (click)="closeReportModal()">×</button>
+    </div>
+
+    <form [formGroup]="reportForm" (ngSubmit)="generateReportPDF()" class="modal-body">
+      @if(reportErrorMessage) {
+      <div class="error-message" style="color: #e53e3e; margin-bottom: 1rem;">{{ reportErrorMessage }}</div>
+      }
+
+      <div class="form-group">
+        <label style="display: block; font-weight: 500;">Puesto (Opcional)</label>
+        <select formControlName="puesto">
+          <option value="">Todos los puestos</option>
+          @for(puesto of uniquePuestos; track puesto) {
+          <option [value]="puesto">{{ puesto }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label style="display: block; font-weight: 500;">Área (Opcional)</label>
+        <select formControlName="area">
+          <option value="">Todas las áreas</option>
+          @for(area of uniqueAreas; track area) {
+          <option [value]="area">{{ area }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label style="display: block; font-weight: 500;">Estatus (Opcional)</label>
+        <select formControlName="estatus">
+          <option value="">Todos los estatus</option>
+          <option value="ALTA">Alta</option>
+          <option value="BAJA">Baja</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label style="display: block; font-weight: 500;">Obra (Opcional)</label>
+        <select formControlName="obra">
+          <option value="">Todas las obras</option>
+          <option value="__SIN_OBRA__">Sin obra asignada</option>
+          @for(obra of uniqueObras; track obra) {
+          <option [value]="obra">{{ obra }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label style="display: block; font-weight: 500;">Buscar (Opcional)</label>
+        <input type="text" formControlName="search" placeholder="Buscar por nombre, puesto, área..." />
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" (click)="closeReportModal()">Cancelar</button>
+        <button type="submit" class="btn-primary" [disabled]="isLoading">
+          {{ isLoading ? 'Generando...' : 'Generar' }}
         </button>
       </div>
     </form>

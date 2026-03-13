@@ -279,7 +279,6 @@ export const getAssignedMachinery = async (req, res) => {
                 asignacion.maquinaria.forEach(m => {
                     // Calculamos cantidad pendiente para saber si sigue asignada
                     const cantidadPendiente = m.cantidad - (m.cantidadDevuelta || 0);
-
                     // Si hay items pendientes y el item existe (no es null)
                     if (cantidadPendiente > 0 && m.item) {
                         assignedItems.push({
@@ -287,6 +286,7 @@ export const getAssignedMachinery = async (req, res) => {
                             code: m.item.codigo,
                             name: m.item.nombre,
                             quantity: cantidadPendiente,
+                            fechaAsignacion: asignacion.fechaAsignacion,
                             assigned_to: {
                                 person_id: asignacion.empleado?._id,
                                 person_name: asignacion.empleado?.nombre || 'Desconocido'

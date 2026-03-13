@@ -364,6 +364,7 @@ body {
   min-width: 300px;
   width: auto;
   margin-bottom: 16px;
+  max-width: 300px;
 }
 
 .filtros {
@@ -372,4 +373,14 @@ body {
   flex-wrap: wrap;
   align-items: end;
   gap: 8px;
+}
+
+.total-info {
+  padding: 8px 0 4px;
+  font-size: 14px;
+  color: var(--text-gray);
+
+  strong {
+    color: var(--text-dark);
+  }
 }

@@ -25,10 +25,16 @@ export class UsuariosComponent implements OnInit, AfterViewInit {
   users: User[] = [];
   isLoading = false;
   showModal = false;
+  showReportModal = false;
+  reportErrorMessage = '';
   isEditing = false;
   editingUser: User | null = null;
   userForm: FormGroup;
   errorMessage = '';
+
+  generalFilter = '';
+  strRol = '';
+  uniqueRoles: string[] = [];
 
   changeDetection: ChangeDetectionStrategy.OnPush = ChangeDetectionStrategy.OnPush;
   
@@ -50,7 +56,14 @@ export class UsuariosComponent implements OnInit, AfterViewInit {
       password: ['', [Validators.minLength(6)]],
       rol: ['usuario', Validators.required]
     });
+
+    this.reportForm = this.fb.group({
+      rol: [''],
+      search: ['']
+    });
   }
+
+  reportForm: FormGroup;
 
   ngOnInit(): void {
     this.loadUsers();
@@ -59,6 +72,7 @@ export class UsuariosComponent implements OnInit, AfterViewInit {
   ngAfterViewInit() {
     this.dataSource.paginator = this.paginator;
     this.dataSource.sort = this.sort;
+    this.dataSource.filterPredicate = this.customFilterPredicate();
   }
 
 
@@ -69,6 +83,8 @@ export class UsuariosComponent implements OnInit, AfterViewInit {
       next: (users) => {
         this.users = users;
         this.dataSource = new MatTableDataSource(users);
+        this.extractUniqueRoles();
+        this.dataSource.filterPredicate = this.customFilterPredicate();
 
         // reasignar paginator y sort DESPUÉS de crear el dataSource
         setTimeout(() => {
@@ -205,9 +221,172 @@ export class UsuariosComponent implements OnInit, AfterViewInit {
       }
     })
   }
-  applyFilter(event: Event) {
-    const value = (event.target as HTMLInputElement).value;
-    this.dataSource.filter = value.trim().toLowerCase();
+  extractUniqueRoles() {
+    const roles = new Set<string>();
+    this.users.forEach(u => {
+      if (u.rol) roles.add(u.rol);
+    });
+    this.uniqueRoles = Array.from(roles).sort();
+  }
+
+  applyGeneralFilter(event: Event) {
+    const value = (event.target as HTMLInputElement).value.toLowerCase();
+    this.generalFilter = value;
+    this.dataSource.filter = JSON.stringify({
+      general: value,
+      rol: this.strRol || ''
+    });
+  }
+
+  applyRolFilter(event: Event) {
+    const value = (event.target as HTMLSelectElement).value.toLowerCase();
+    this.strRol = value;
+    this.dataSource.filter = JSON.stringify({
+      general: this.generalFilter || '',
+      rol: value
+    });
+  }
+
+  customFilterPredicate() {
+    return (data: any, filter: string): boolean => {
+      const parsed = JSON.parse(filter);
+
+      const matchesRol =
+        !parsed.rol || (data.rol && data.rol.toLowerCase().includes(parsed.rol));
+
+      const matchesGeneral =
+        !parsed.general ||
+        Object.values(data)
+          .join(' ')
+          .toLowerCase()
+          .includes(parsed.general);
+
+      return matchesRol && matchesGeneral;
+    };
+  }
+
+  openReportModal(): void {
+    this.reportForm.reset({ rol: '', search: '' });
+    this.showReportModal = true;
+    this.reportErrorMessage = '';
+  }
+
+  closeReportModal(): void {
+    this.showReportModal = false;
+    this.reportForm.reset();
+    this.reportErrorMessage = '';
+  }
+
+  generateReportPDF(): void {
+    const filterRol = (this.reportForm.get('rol')?.value || '').toLowerCase();
+    const filterSearch = (this.reportForm.get('search')?.value || '').toLowerCase();
+
+    let filteredUsers = [...this.users];
+
+    if (filterRol) {
+      filteredUsers = filteredUsers.filter(u => u.rol && u.rol.toLowerCase() === filterRol);
+    }
+
+    if (filterSearch) {
+      filteredUsers = filteredUsers.filter(u =>
+        (u.username || '').toLowerCase().includes(filterSearch) ||
+        (u.email || '').toLowerCase().includes(filterSearch) ||
+        (u.rol || '').toLowerCase().includes(filterSearch)
+      );
+    }
+
+    if (filteredUsers.length === 0) {
+      this.reportErrorMessage = 'No se encontraron registros con los filtros seleccionados.';
+      return;
+    }
+
+    import('jspdf').then(jsPDF => {
+      import('jspdf-autotable').then(autoTable => {
+        const doc = new jsPDF.default();
+        const now = new Date();
+        const docDate = now.toLocaleDateString();
+
+        const logoUrl = 'assets/images/logo.svg';
+        const img = new Image();
+        img.src = logoUrl;
+
+        const drawPDFContent = () => {
+          const pageWidth = doc.internal.pageSize.width;
+
+          // Title
+          doc.setFontSize(14);
+          doc.setFont('times', 'bold');
+          doc.text('Reporte de Usuarios', pageWidth / 2, 20, { align: 'center' });
+
+          doc.setFontSize(10);
+          doc.setFont('times', 'normal');
+          doc.text(`Fecha: ${docDate}`, pageWidth - 15, 20, { align: 'right' });
+
+          // Filters applied info
+          let infoY = 28;
+          doc.setFontSize(9);
+          if (filterRol) {
+            doc.text(`Filtro Rol: ${filterRol}`, 15, infoY);
+            infoY += 5;
+          }
+          if (filterSearch) {
+            doc.text(`Búsqueda: ${filterSearch}`, 15, infoY);
+            infoY += 5;
+          }
+          doc.text(`Total: ${filteredUsers.length} usuario(s)`, 15, infoY);
+          infoY += 5;
+
+          // Table
+          const body = filteredUsers.map(u => [
+            u.username || '-',
+            u.email || '-',
+            u.rol || '-'
+          ]);
+
+          (autoTable as any).default(doc, {
+            startY: infoY + 3,
+            head: [['Usuario', 'Email', 'Rol']],
+            body: body,
+            theme: 'grid',
+            headStyles: { fillColor: [220, 53, 69] },
+            styles: { fontSize: 10 }
+          });
+
+          doc.save(`Reporte_Usuarios_${now.getTime()}.pdf`);
+          this.closeReportModal();
+          Swal.fire('Éxito', 'Reporte generado correctamente', 'success');
+        };
+
+        if (img.complete) {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0);
+            const pngDataUrl = canvas.toDataURL('image/png');
+            doc.addImage(pngDataUrl, 'PNG', 15, 10, 30, 12);
+          }
+          drawPDFContent();
+        } else {
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(img, 0, 0);
+              const pngDataUrl = canvas.toDataURL('image/png');
+              doc.addImage(pngDataUrl, 'PNG', 15, 10, 30, 12);
+            }
+            drawPDFContent();
+          };
+          img.onerror = () => {
+            drawPDFContent();
+          };
+        }
+      });
+    });
   }
 }
 

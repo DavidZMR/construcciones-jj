@@ -1,6 +1,6 @@
 import { Component, OnInit, ChangeDetectorRef, ViewChild, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, FormArray, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, FormGroup, FormArray, ReactiveFormsModule, Validators, FormsModule } from '@angular/forms';
 import { AsignacionService } from '../../services/asignacion.service';
 import { EmpleadoService } from '../../services/empleado.service';
 import { MaquinariaEquipoService } from '../../services/maquinaria-equipo.service';
@@ -18,6 +18,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
   imports: [
     CommonModule,
     ReactiveFormsModule,
+    FormsModule,
     MatTableModule,
     MatPaginatorModule,
     MatSortModule,
@@ -48,6 +49,11 @@ export class Asignaciones implements OnInit, AfterViewInit {
   generalFilter = ''
   strStatus = ''
   strObra = ''
+  strEmpleado = ''
+  fechaAsignacionDesde = ''
+  fechaAsignacionHasta = ''
+  fechaDevolucionDesde = ''
+  fechaDevolucionHasta = ''
 
   displayedColumns: string[] = ['fechaAsignacion', 'empleado', 'obra', 'maquinaria', 'estado', 'fechaDevolucion', 'acciones'];
   dataSource = new MatTableDataSource<Asignacion>();
@@ -88,7 +94,9 @@ export class Asignaciones implements OnInit, AfterViewInit {
     this.reportForm = this.fb.group({
       machineryEquipment: [[]],
       obra: [[]],
-      empleado: [[]]
+      empleado: [[]],
+      fechaAsigDesde: [''],
+      fechaAsigHasta: ['']
     });
   }
 
@@ -301,6 +309,7 @@ export class Asignaciones implements OnInit, AfterViewInit {
           seen.add(item.id);
           return !duplicate;
         });
+        this.cdr.detectChanges();
       },
       error: (error) => {
         console.error('Error loading assigned machinery', error);
@@ -314,10 +323,8 @@ export class Asignaciones implements OnInit, AfterViewInit {
       const selectedIds = this.reportForm.get('machineryEquipment')?.value || [];
       const selectedObras = this.reportForm.get('obra')?.value || [];
       const selectedEmpleados = this.reportForm.get('empleado')?.value || [];
-
-      // Validar que si no hay filtros, se advierta o se permita todo
-      // En este caso, "emptySelection: no aplicar ningún filtro" => Mostrar Todo
-      // Pero "si se selecciona, filtra solo...", AND logic
+      const fDesde = this.reportForm.get('fechaAsigDesde')?.value || '';
+      const fHasta = this.reportForm.get('fechaAsigHasta')?.value || '';
 
       let selectedItems = this.assignedMachinery;
       // Filter by Obra
@@ -339,6 +346,21 @@ export class Asignaciones implements OnInit, AfterViewInit {
       // Filter by Maquinaria (Specific Items)
       if (selectedIds.length > 0) {
         selectedItems = selectedItems.filter(item => selectedIds.includes(item.id));
+      }
+
+      // Filter by Fecha Asignación range
+      if (fDesde || fHasta) {
+        selectedItems = selectedItems.filter(item => {
+          const fecha = item.fechaAsignacion ? new Date(item.fechaAsignacion) : null;
+          if (!fecha) return false;
+          if (fDesde && fecha < new Date(fDesde)) return false;
+          if (fHasta) {
+            const hasta = new Date(fHasta);
+            hasta.setHours(23, 59, 59, 999);
+            if (fecha > hasta) return false;
+          }
+          return true;
+        });
       }
 
       if (selectedItems.length === 0) {
@@ -369,8 +391,19 @@ export class Asignaciones implements OnInit, AfterViewInit {
             doc.setFont('times', 'normal');
             doc.text(`Fecha: ${docDate}`, pageWidth - 15, 20, { align: 'right' });
 
+            let infoY = 27;
+            doc.setFontSize(9);
+            if (fDesde || fHasta) {
+              const rangoTexto = fDesde && fHasta ? `${fDesde} a ${fHasta}` : fDesde ? `Desde ${fDesde}` : `Hasta ${fHasta}`;
+              doc.text(`Fecha asignación: ${rangoTexto}`, 15, infoY);
+              infoY += 5;
+            }
+            doc.text(`Total: ${selectedItems.length} registro(s)`, 15, infoY);
+            infoY += 5;
+
             // Table
             const body = selectedItems.map(item => [
+              item.fechaAsignacion ? new Date(item.fechaAsignacion).toLocaleDateString() : '-',
               item.code || '-',
               item.name || '-',
               item.assigned_to?.person_name || '-',
@@ -380,12 +413,12 @@ export class Asignaciones implements OnInit, AfterViewInit {
             ]);
 
             (autoTable as any).default(doc, {
-              startY: 30,
-              head: [['Código', 'Nombre', 'Asignado a', 'Obra', 'C. Asig.', 'C. Dev.']],
+              startY: infoY + 2,
+              head: [['Fecha', 'Código', 'Nombre', 'Asignado a', 'Obra', 'C. Asig.', 'C. Dev.']],
               body: body,
               theme: 'grid',
-              headStyles: { fillColor: [220, 53, 69] }, // Brand color red? Or just standard grey
-              styles: { fontSize: 10 }
+              headStyles: { fillColor: [220, 53, 69] },
+              styles: { fontSize: 9 }
             });
 
             doc.save(`Reporte_Maquinaria_Asignada_${now.getTime()}.pdf`);
@@ -393,7 +426,7 @@ export class Asignaciones implements OnInit, AfterViewInit {
             Swal.fire('Éxito', 'Reporte generado correctamente', 'success');
           };
 
-          img.onload = () => {
+          if (img.complete) {
             const canvas = document.createElement('canvas');
             canvas.width = img.width;
             canvas.height = img.height;
@@ -401,19 +434,25 @@ export class Asignaciones implements OnInit, AfterViewInit {
             if (ctx) {
               ctx.drawImage(img, 0, 0);
               const pngDataUrl = canvas.toDataURL('image/png');
-              doc.addImage(pngDataUrl, 'PNG', 15, 10, 30, 12); // Adjust logo position/size
+              doc.addImage(pngDataUrl, 'PNG', 15, 10, 30, 12);
             }
             drawPDFContent();
-          };
-
-          img.onerror = () => {
-            // Generated without logo
-            drawPDFContent();
-          };
-
-          // Trigger image load if not cached, otherwise it might be instant
-          if (img.complete) {
-            img.onload!(new Event('load'));
+          } else {
+            img.onload = () => {
+              const canvas = document.createElement('canvas');
+              canvas.width = img.width;
+              canvas.height = img.height;
+              const ctx = canvas.getContext('2d');
+              if (ctx) {
+                ctx.drawImage(img, 0, 0);
+                const pngDataUrl = canvas.toDataURL('image/png');
+                doc.addImage(pngDataUrl, 'PNG', 15, 10, 30, 12);
+              }
+              drawPDFContent();
+            };
+            img.onerror = () => {
+              drawPDFContent();
+            };
           }
         });
       });
@@ -495,35 +534,41 @@ export class Asignaciones implements OnInit, AfterViewInit {
     }
   }
 
-  applyGeneralFilter(event: Event) {
-    const value = (event.target as HTMLInputElement).value.toLowerCase();
-    this.generalFilter = value;
-
-    this.dataSource.filter = JSON.stringify({
-      general: value,
-      status: this.strStatus || "",
-      obra: this.strObra || ""
+  private buildFilterJSON(overrides: any = {}) {
+    return JSON.stringify({
+      general: overrides.general ?? this.generalFilter ?? '',
+      status: overrides.status ?? this.strStatus ?? '',
+      obra: overrides.obra ?? this.strObra ?? '',
+      empleado: overrides.empleado ?? this.strEmpleado ?? '',
+      fechaAsigDesde: this.fechaAsignacionDesde ?? '',
+      fechaAsigHasta: this.fechaAsignacionHasta ?? '',
+      fechaDevDesde: this.fechaDevolucionDesde ?? '',
+      fechaDevHasta: this.fechaDevolucionHasta ?? ''
     });
+  }
+
+  applyGeneralFilter(event: Event) {
+    this.generalFilter = (event.target as HTMLInputElement).value.toLowerCase();
+    this.dataSource.filter = this.buildFilterJSON({ general: this.generalFilter });
   }
 
   applyStatusFilter(event: Event) {
-    const value = (event.target as HTMLSelectElement).value.toLowerCase();
-    this.strStatus = value;
-    this.dataSource.filter = JSON.stringify({
-      general: this.generalFilter || "",
-      status: value,
-      obra: this.strObra || ""
-    });
+    this.strStatus = (event.target as HTMLSelectElement).value.toLowerCase();
+    this.dataSource.filter = this.buildFilterJSON({ status: this.strStatus });
   }
 
   applyObraFilter(event: Event) {
-    const value = (event.target as HTMLSelectElement).value;
-    this.strObra = value;
-    this.dataSource.filter = JSON.stringify({
-      general: this.generalFilter || "",
-      status: this.strStatus || "",
-      obra: value
-    });
+    this.strObra = (event.target as HTMLSelectElement).value;
+    this.dataSource.filter = this.buildFilterJSON({ obra: this.strObra });
+  }
+
+  applyEmpleadoFilter(event: Event) {
+    this.strEmpleado = (event.target as HTMLSelectElement).value;
+    this.dataSource.filter = this.buildFilterJSON({ empleado: this.strEmpleado });
+  }
+
+  applyDateFilter() {
+    this.dataSource.filter = this.buildFilterJSON();
   }
 
   customFilterPredicate() {
@@ -536,15 +581,53 @@ export class Asignaciones implements OnInit, AfterViewInit {
       const obraId = data.obra && (data.obra._id || data.obra.id) ? (data.obra._id || data.obra.id) : '';
       const matchesObra = !parsed.obra || obraId === parsed.obra;
 
-      // Filtro general
+      const empleadoId = data.empleado && (data.empleado._id || data.empleado.id) ? (data.empleado._id || data.empleado.id) : '';
+      const matchesEmpleado = !parsed.empleado || empleadoId === parsed.empleado;
+
       const matchesGeneral =
         !parsed.general ||
         Object.values(data)
-          .join(" ")
+          .join(' ')
           .toLowerCase()
           .includes(parsed.general);
 
-      return matchesGeneral && matchesStatus && matchesObra;
+      // Date range: Fecha Asignación
+      let matchesFechaAsig = true;
+      if (parsed.fechaAsigDesde || parsed.fechaAsigHasta) {
+        const fecha = data.fechaAsignacion ? new Date(data.fechaAsignacion) : null;
+        if (!fecha) {
+          matchesFechaAsig = false;
+        } else {
+          if (parsed.fechaAsigDesde) {
+            matchesFechaAsig = matchesFechaAsig && fecha >= new Date(parsed.fechaAsigDesde);
+          }
+          if (parsed.fechaAsigHasta) {
+            const hasta = new Date(parsed.fechaAsigHasta);
+            hasta.setHours(23, 59, 59, 999);
+            matchesFechaAsig = matchesFechaAsig && fecha <= hasta;
+          }
+        }
+      }
+
+      // Date range: Fecha Devolución
+      let matchesFechaDev = true;
+      if (parsed.fechaDevDesde || parsed.fechaDevHasta) {
+        const fecha = data.fechaDevolucion ? new Date(data.fechaDevolucion) : null;
+        if (!fecha) {
+          matchesFechaDev = false;
+        } else {
+          if (parsed.fechaDevDesde) {
+            matchesFechaDev = matchesFechaDev && fecha >= new Date(parsed.fechaDevDesde);
+          }
+          if (parsed.fechaDevHasta) {
+            const hasta = new Date(parsed.fechaDevHasta);
+            hasta.setHours(23, 59, 59, 999);
+            matchesFechaDev = matchesFechaDev && fecha <= hasta;
+          }
+        }
+      }
+
+      return matchesGeneral && matchesStatus && matchesObra && matchesEmpleado && matchesFechaAsig && matchesFechaDev;
     };
   }
 
