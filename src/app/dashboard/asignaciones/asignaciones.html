@@ -151,7 +151,7 @@
           </button>
           }
 
-          <button class="btn-icon btn-print" (click)="generatePDF(item)" title="Imprimir Comprobante">
+          <button class="btn-icon btn-print" (click)="openSignatureModal(item)" title="Imprimir Comprobante">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4a5568" stroke-width="2">
               <path d="M6 9V2h12v7"></path>
               <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
@@ -436,6 +436,87 @@
         </button>
       </div>
     </form>
+  </div>
+</div>
+}
+
+<!-- Modal Firma Digital -->
+@if(showSignatureModal) {
+<div class="modal-overlay" (click)="closeSignatureModal()">
+  <div class="modal-content signature-modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h2>Firmas del Comprobante</h2>
+      <button class="modal-close" (click)="closeSignatureModal()">×</button>
+    </div>
+
+    <div class="modal-body">
+      <p style="color: #64748b; margin-bottom: 12px; font-size: 0.9em;">Selecciona una sección de firma, dibuja la firma y guárdala. Puedes firmar varias o generar sin firmas.</p>
+
+      <!-- Signature Slot Tabs -->
+      <div class="signature-slots">
+        <button type="button" class="signature-slot-btn"
+          [class.active]="activeSignatureSlot === 'recibi'"
+          [class.signed]="signatures['recibi']"
+          (click)="selectSignatureSlot('recibi')">
+          <span class="slot-label">Recibí de Conformidad</span>
+          @if(signatures['recibi']) { <span class="slot-check">✓</span> }
+        </button>
+        <button type="button" class="signature-slot-btn"
+          [class.active]="activeSignatureSlot === 'coordinador'"
+          [class.signed]="signatures['coordinador']"
+          (click)="selectSignatureSlot('coordinador')">
+          <span class="slot-label">Coordinador de Almacén</span>
+          @if(signatures['coordinador']) { <span class="slot-check">✓</span> }
+        </button>
+        <button type="button" class="signature-slot-btn"
+          [class.active]="activeSignatureSlot === 'vigilancia'"
+          [class.signed]="signatures['vigilancia']"
+          (click)="selectSignatureSlot('vigilancia')">
+          <span class="slot-label">Vigilancia</span>
+          @if(signatures['vigilancia']) { <span class="slot-check">✓</span> }
+        </button>
+        <button type="button" class="signature-slot-btn"
+          [class.active]="activeSignatureSlot === 'chofer'"
+          [class.signed]="signatures['chofer']"
+          (click)="selectSignatureSlot('chofer')">
+          <span class="slot-label">Chofer</span>
+          @if(signatures['chofer']) { <span class="slot-check">✓</span> }
+        </button>
+      </div>
+
+      <!-- Canvas Area -->
+      @if(activeSignatureSlot) {
+      <div class="signature-canvas-container">
+        <label style="font-weight: 500; margin-bottom: 6px; display: block;">Firmar: {{ getSlotLabel(activeSignatureSlot) }}</label>
+        <canvas #signatureCanvas
+          class="signature-canvas"
+          width="560" height="200"
+          (pointerdown)="startDrawing($event)"
+          (pointermove)="draw($event)"
+          (pointerup)="stopDrawing()"
+          (pointerleave)="stopDrawing()">
+        </canvas>
+        <div style="display: flex; gap: 8px; margin-top: 8px;">
+          <button type="button" class="btn-secondary" (click)="clearSignature()" style="font-size: 0.85em;">Limpiar</button>
+          <button type="button" class="btn-primary" (click)="saveCurrentSignature()" style="font-size: 0.85em;">Guardar Firma</button>
+          @if(signatures[activeSignatureSlot]) {
+          <button type="button" style="font-size: 0.85em; background: #e53e3e; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer;" (click)="removeSignature()">Eliminar Firma</button>
+          }
+        </div>
+      </div>
+      } @else {
+      <div style="text-align: center; padding: 40px; color: #94a3b8; border: 2px dashed #e2e8f0; border-radius: 8px; margin-top: 12px;">
+        Selecciona una sección de firma arriba para comenzar
+      </div>
+      }
+
+      <div class="modal-footer" style="margin-top: 16px;">
+        <button type="button" class="btn-secondary" (click)="closeSignatureModal()">Cancelar</button>
+        <button type="button" class="btn-primary" (click)="generateSignedPDF()">
+          Generar PDF
+        </button>
+      </div>
+    </div>
   </div>
 </div>
 }

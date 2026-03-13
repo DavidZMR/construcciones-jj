@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectorRef, ViewChild, AfterViewInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef, ViewChild, AfterViewInit, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, FormArray, ReactiveFormsModule, Validators, FormsModule } from '@angular/forms';
 import { AsignacionService } from '../../services/asignacion.service';
@@ -38,8 +38,18 @@ export class Asignaciones implements OnInit, AfterViewInit {
   showModal = false;
   showReturnModal = false;
   showReportModal = false;
+  showSignatureModal = false;
   isEditing = false;
   editingId: string | null = null;
+
+  // Signature state
+  activeSignatureSlot: string = '';
+  signatures: { [key: string]: string } = {};
+  currentAsignacionForPDF: Asignacion | null = null;
+  private isDrawing = false;
+  private canvasCtx: CanvasRenderingContext2D | null = null;
+
+  @ViewChild('signatureCanvas') signatureCanvas!: ElementRef<HTMLCanvasElement>;
 
   form: FormGroup;
   returnForm: FormGroup;
@@ -662,56 +672,39 @@ export class Asignaciones implements OnInit, AfterViewInit {
     return (asignacion.obra as any).nombre_obra || '-';
   }
 
-  generatePDF(asignacion: Asignacion) {
+  generatePDF(asignacion: Asignacion, sigs: { [key: string]: string } = {}) {
     import('jspdf').then(jsPDF => {
       import('jspdf-autotable').then(autoTable => {
         const doc = new jsPDF.default();
 
-        // Folio
         const now = new Date();
         const folio = `ASG-${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}-${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
 
-        // Logo
         const logoUrl = 'assets/images/logo.svg';
         const img = new Image();
         img.src = logoUrl;
-        img.onload = () => {
-          // Create canvas to convert SVG to PNG
-          const canvas = document.createElement('canvas');
-          canvas.width = img.width;
-          canvas.height = img.height;
-          const ctx = canvas.getContext('2d');
 
-          if (ctx) {
-            ctx.drawImage(img, 0, 0);
-            const pngDataUrl = canvas.toDataURL('image/png');
-            // Add logo as PNG (smaller size)
-            doc.addImage(pngDataUrl, 'PNG', 15, 10, 35, 14);
-          }
-
-          // Header - Calibri Bold
+        const buildPDF = () => {
           doc.setFontSize(11);
-          doc.setFont('times', 'bold'); // jsPDF no tiene Calibri, usamos Times como alternativa
+          doc.setFont('times', 'bold');
           const pageWidth = doc.internal.pageSize.width;
           doc.text('CONSTRUCCIONES J.J. S.A. DE C.V.', pageWidth / 2, 16, { align: 'center' });
 
           doc.setFontSize(11);
-          doc.setFont('times', 'normal'); // Calibri Light simulado con Times normal
+          doc.setFont('times', 'normal');
           doc.text('ASIGNACIÓN DE MAQUINARIA Y EQUIPO', pageWidth / 2, 23, { align: 'center' });
 
           doc.setFontSize(11);
-          doc.setTextColor(220, 53, 69); // Red color for folio
+          doc.setTextColor(220, 53, 69);
           doc.text(`FOLIO: ${folio}`, 155, 16);
-          doc.setTextColor(0, 0, 0); // Reset color
+          doc.setTextColor(0, 0, 0);
 
-          // Info Section
           doc.setFontSize(11);
           doc.text(`FECHA: ${new Date(asignacion.fechaAsignacion).toLocaleDateString()}`, 155, 23);
 
           doc.setLineWidth(0.5);
           doc.line(15, 30, 195, 30);
 
-          // Datos del empleado - Calibri Bold para títulos
           doc.setFont('times', 'bold');
           doc.text('DATOS DEL EMPLEADO:', 15, 38);
           doc.setFont('times', 'normal');
@@ -722,7 +715,6 @@ export class Asignaciones implements OnInit, AfterViewInit {
           doc.setFont('times', 'normal');
           doc.text(this.getObraNombre(asignacion), 64, 45);
 
-          // Table
           const machineryData = (asignacion.maquinaria as any[]).map(m => [
             m.item?.codigo || '-',
             m.item?.nombre || '-',
@@ -736,41 +728,25 @@ export class Asignaciones implements OnInit, AfterViewInit {
             body: machineryData,
             theme: 'grid',
             headStyles: {
-              fillColor: [200, 200, 200], // Gris
-              textColor: [0, 0, 0], // Negro
+              fillColor: [200, 200, 200],
+              textColor: [0, 0, 0],
               fontStyle: 'bold',
               halign: 'center',
               fontSize: 11
             },
-            styles: {
-              fontSize: 11,
-              halign: 'center',
-              valign: 'middle'
-            },
-            columnStyles: {
-              1: { halign: 'left' }, // Descripción alineada a la izquierda
-              3: { halign: 'left' }  // Observaciones alineadas a la izquierda
-            }
+            styles: { fontSize: 11, halign: 'center', valign: 'middle' },
+            columnStyles: { 1: { halign: 'left' }, 3: { halign: 'left' } }
           });
 
           const finalY = (doc as any).lastAutoTable.finalY + 10;
 
-          // Legal Text - Justificado
           doc.setFontSize(11);
           doc.setFont('times', 'normal');
           const legalText = "ESTOY DE ACUERDO EN DEVOLVER EL EQUIPO DE PROTECCIÓN PERSONAL, HERRAMIENTA Y MAQUINARIA EN BUENAS CONDICIONES, CONSIDERANDO EL DESGASTE POR USO RAZONABLE AL ALMACÉN DE CONSTRUCCIONES JJ UNA VEZ TERMINADOS MIS TRABAJOS CON DONDE LOS NECESITE. SI NO FUESE DE ESTA MANERA, ES DECIR, QUE DIERA MAL USO, LA EMPRESA DEBERÁ DESCONTAR DE MI SALARIO EL VALOR DE REPARACIÓN O EN SU CASO EL VALOR DE REPOSICIÓN. (ART. 110-1 LFT)";
-
           const splitText = doc.splitTextToSize(legalText, 180);
           doc.text(splitText, 15, finalY, { align: 'justify', maxWidth: 180 });
 
-          // Signatures
-          // Calculate start Y. Ensure we have enough space, otherwise add page?
-          // For simplicity, we assume one page for now or autoTable handled breaks.
-          // We need about 60-70 units for 2 rows of signatures.
-
           let signatureY = finalY + 50;
-
-          // Check if we are too close to bottom (A4 is ~297mm)
           if (signatureY + 60 > 280) {
             doc.addPage();
             signatureY = 40;
@@ -780,17 +756,21 @@ export class Asignaciones implements OnInit, AfterViewInit {
           doc.setFont('times', 'normal');
           doc.setFontSize(11);
 
-          // Row 1
           // Signature 1: Recibí (Left)
+          if (sigs['recibi']) {
+            doc.addImage(sigs['recibi'], 'PNG', 27, signatureY - 22, 56, 20);
+          }
           doc.line(25, signatureY, 85, signatureY);
           doc.text('RECIBÍ DE CONFORMIDAD', 55, signatureY + 5, { align: 'center' });
           const nombreEmpleado = (asignacion.empleado as any).nombre || '';
-          // Truncate or split if too long? For now just print.
           doc.setFontSize(10);
           doc.text(nombreEmpleado, 55, signatureY + 10, { align: 'center' });
           doc.setFontSize(11);
 
           // Signature 2: Coordinador (Right)
+          if (sigs['coordinador']) {
+            doc.addImage(sigs['coordinador'], 'PNG', 127, signatureY - 22, 56, 20);
+          }
           doc.line(125, signatureY, 185, signatureY);
           doc.text('COORDINADOR DE ALMACÉN', 155, signatureY + 5, { align: 'center' });
 
@@ -798,10 +778,16 @@ export class Asignaciones implements OnInit, AfterViewInit {
           const signatureY2 = signatureY + 35;
 
           // Signature 3: Vigilancia (Left)
+          if (sigs['vigilancia']) {
+            doc.addImage(sigs['vigilancia'], 'PNG', 27, signatureY2 - 22, 56, 20);
+          }
           doc.line(25, signatureY2, 85, signatureY2);
           doc.text('VIGILANCIA', 55, signatureY2 + 5, { align: 'center' });
 
           // Signature 4: Chofer (Right)
+          if (sigs['chofer']) {
+            doc.addImage(sigs['chofer'], 'PNG', 127, signatureY2 - 22, 56, 20);
+          }
           doc.line(125, signatureY2, 185, signatureY2);
           doc.text('CHOFER', 155, signatureY2 + 5, { align: 'center' });
 
@@ -809,12 +795,8 @@ export class Asignaciones implements OnInit, AfterViewInit {
           const pageHeight = doc.internal.pageSize.height;
           doc.setFontSize(11);
           doc.setTextColor(100, 100, 100);
-
-          // Número de formato a la derecha
           doc.setFont('times', 'bold');
           doc.text('F-610-7.1', 194, pageHeight - 15, { align: 'right' });
-
-          // Texto legal
           doc.setFont('times', 'normal');
           const footerText = "ESTE DOCUMENTO CONTIENE INFORMACIÓN PROPIEDAD DE CONSTRUCCIONES J.J. S.A. DE C.V. CONSIDERADA DE USO INTERNO. CUALQUIER DISTRIBUCION O REPRODUCCIÓN SERÁ BAJO AUTORIZACIÓN ESPECÍFICA.";
           const splitFooter = doc.splitTextToSize(footerText, 180);
@@ -822,12 +804,154 @@ export class Asignaciones implements OnInit, AfterViewInit {
 
           doc.save(`Asignacion_${folio}.pdf`);
         };
-        img.onerror = () => {
-          console.error('Error loading logo');
-          // Fallback without logo or handle error
-          doc.save(`Asignacion_${folio}.pdf`);
+
+        if (img.complete) {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0);
+            const pngDataUrl = canvas.toDataURL('image/png');
+            doc.addImage(pngDataUrl, 'PNG', 15, 10, 35, 14);
+          }
+          buildPDF();
+        } else {
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(img, 0, 0);
+              const pngDataUrl = canvas.toDataURL('image/png');
+              doc.addImage(pngDataUrl, 'PNG', 15, 10, 35, 14);
+            }
+            buildPDF();
+          };
+          img.onerror = () => {
+            console.error('Error loading logo');
+            buildPDF();
+          };
         }
       });
     });
   }
+
+  // ===== SIGNATURE METHODS =====
+
+  openSignatureModal(asignacion: Asignacion): void {
+    this.currentAsignacionForPDF = asignacion;
+    this.signatures = {};
+    this.activeSignatureSlot = '';
+    this.showSignatureModal = true;
+    this.cdr.detectChanges();
+  }
+
+  closeSignatureModal(): void {
+    this.showSignatureModal = false;
+    this.currentAsignacionForPDF = null;
+    this.signatures = {};
+    this.activeSignatureSlot = '';
+    this.isDrawing = false;
+    this.canvasCtx = null;
+  }
+
+  selectSignatureSlot(slot: string): void {
+    this.activeSignatureSlot = slot;
+    this.cdr.detectChanges();
+    setTimeout(() => this.initCanvas(), 50);
+  }
+
+  private initCanvas(): void {
+    if (!this.signatureCanvas) return;
+    const canvas = this.signatureCanvas.nativeElement;
+    this.canvasCtx = canvas.getContext('2d');
+    if (this.canvasCtx) {
+      this.canvasCtx.strokeStyle = '#1a1a2e';
+      this.canvasCtx.lineWidth = 2;
+      this.canvasCtx.lineCap = 'round';
+      this.canvasCtx.lineJoin = 'round';
+      this.canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+      if (this.signatures[this.activeSignatureSlot]) {
+        const sigImg = new Image();
+        sigImg.src = this.signatures[this.activeSignatureSlot];
+        sigImg.onload = () => {
+          this.canvasCtx?.drawImage(sigImg, 0, 0);
+        };
+      }
+    }
+  }
+
+  startDrawing(event: PointerEvent): void {
+    if (!this.canvasCtx) return;
+    this.isDrawing = true;
+    const canvas = this.signatureCanvas.nativeElement;
+    canvas.setPointerCapture(event.pointerId);
+    const rect = canvas.getBoundingClientRect();
+    const x = (event.clientX - rect.left) * (canvas.width / rect.width);
+    const y = (event.clientY - rect.top) * (canvas.height / rect.height);
+    this.canvasCtx.beginPath();
+    this.canvasCtx.moveTo(x, y);
+    if (event.pressure && event.pressure > 0) {
+      this.canvasCtx.lineWidth = Math.max(1, event.pressure * 4);
+    }
+  }
+
+  draw(event: PointerEvent): void {
+    if (!this.isDrawing || !this.canvasCtx) return;
+    const canvas = this.signatureCanvas.nativeElement;
+    const rect = canvas.getBoundingClientRect();
+    const x = (event.clientX - rect.left) * (canvas.width / rect.width);
+    const y = (event.clientY - rect.top) * (canvas.height / rect.height);
+    if (event.pressure && event.pressure > 0) {
+      this.canvasCtx.lineWidth = Math.max(1, event.pressure * 4);
+    }
+    this.canvasCtx.lineTo(x, y);
+    this.canvasCtx.stroke();
+  }
+
+  stopDrawing(): void {
+    this.isDrawing = false;
+  }
+
+  clearSignature(): void {
+    if (!this.canvasCtx || !this.signatureCanvas) return;
+    const canvas = this.signatureCanvas.nativeElement;
+    this.canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+
+  saveCurrentSignature(): void {
+    if (!this.signatureCanvas || !this.activeSignatureSlot) return;
+    const canvas = this.signatureCanvas.nativeElement;
+    this.signatures[this.activeSignatureSlot] = canvas.toDataURL('image/png');
+    Swal.fire({ icon: 'success', title: 'Firma guardada', text: `Firma de "${this.getSlotLabel(this.activeSignatureSlot)}" guardada.`, timer: 1500, showConfirmButton: false });
+    this.cdr.detectChanges();
+  }
+
+  removeSignature(): void {
+    if (!this.activeSignatureSlot) return;
+    delete this.signatures[this.activeSignatureSlot];
+    this.clearSignature();
+    this.cdr.detectChanges();
+  }
+
+  getSlotLabel(slot: string): string {
+    const labels: { [key: string]: string } = {
+      'recibi': 'Recibí de Conformidad',
+      'coordinador': 'Coordinador de Almacén',
+      'vigilancia': 'Vigilancia',
+      'chofer': 'Chofer'
+    };
+    return labels[slot] || slot;
+  }
+
+  generateSignedPDF(): void {
+    if (!this.currentAsignacionForPDF) return;
+    const asignacion = this.currentAsignacionForPDF;
+    const sigs = { ...this.signatures };
+    this.closeSignatureModal();
+    this.generatePDF(asignacion, sigs);
+  }
 }
+
