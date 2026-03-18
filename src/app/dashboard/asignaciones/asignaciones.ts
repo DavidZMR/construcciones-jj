@@ -46,6 +46,8 @@ export class Asignaciones implements OnInit, AfterViewInit {
   activeSignatureSlot: string = '';
   signatures: { [key: string]: string } = {};
   currentAsignacionForPDF: Asignacion | null = null;
+  currentPreviewImage: string | null = null;
+  isCanvasDirty: boolean = false;
   private isDrawing = false;
   private canvasCtx: CanvasRenderingContext2D | null = null;
 
@@ -758,9 +760,9 @@ export class Asignaciones implements OnInit, AfterViewInit {
 
           // Signature 1: Recibí (Left)
           if (sigs['recibi']) {
-            doc.addImage(sigs['recibi'], 'PNG', 27, signatureY - 22, 56, 20);
+            doc.addImage(sigs['recibi'], 'PNG', 20, signatureY - 21, 70, 28);
           }
-          doc.line(25, signatureY, 85, signatureY);
+          doc.line(20, signatureY, 90, signatureY);
           doc.text('RECIBÍ DE CONFORMIDAD', 55, signatureY + 5, { align: 'center' });
           const nombreEmpleado = (asignacion.empleado as any).nombre || '';
           doc.setFontSize(10);
@@ -769,9 +771,9 @@ export class Asignaciones implements OnInit, AfterViewInit {
 
           // Signature 2: Coordinador (Right)
           if (sigs['coordinador']) {
-            doc.addImage(sigs['coordinador'], 'PNG', 127, signatureY - 22, 56, 20);
+            doc.addImage(sigs['coordinador'], 'PNG', 120, signatureY - 21, 70, 28);
           }
-          doc.line(125, signatureY, 185, signatureY);
+          doc.line(120, signatureY, 190, signatureY);
           doc.text('COORDINADOR DE ALMACÉN', 155, signatureY + 5, { align: 'center' });
 
           // Row 2
@@ -779,16 +781,16 @@ export class Asignaciones implements OnInit, AfterViewInit {
 
           // Signature 3: Vigilancia (Left)
           if (sigs['vigilancia']) {
-            doc.addImage(sigs['vigilancia'], 'PNG', 27, signatureY2 - 22, 56, 20);
+            doc.addImage(sigs['vigilancia'], 'PNG', 20, signatureY2 - 21, 70, 28);
           }
-          doc.line(25, signatureY2, 85, signatureY2);
+          doc.line(20, signatureY2, 90, signatureY2);
           doc.text('VIGILANCIA', 55, signatureY2 + 5, { align: 'center' });
 
           // Signature 4: Chofer (Right)
           if (sigs['chofer']) {
-            doc.addImage(sigs['chofer'], 'PNG', 127, signatureY2 - 22, 56, 20);
+            doc.addImage(sigs['chofer'], 'PNG', 120, signatureY2 - 21, 70, 28);
           }
-          doc.line(125, signatureY2, 185, signatureY2);
+          doc.line(120, signatureY2, 190, signatureY2);
           doc.text('CHOFER', 155, signatureY2 + 5, { align: 'center' });
 
           // Footer
@@ -853,11 +855,33 @@ export class Asignaciones implements OnInit, AfterViewInit {
     this.currentAsignacionForPDF = null;
     this.signatures = {};
     this.activeSignatureSlot = '';
+    this.currentPreviewImage = null;
+    this.isCanvasDirty = false;
     this.isDrawing = false;
     this.canvasCtx = null;
   }
 
-  selectSignatureSlot(slot: string): void {
+  async selectSignatureSlot(slot: string): Promise<void> {
+    if (this.activeSignatureSlot && this.activeSignatureSlot !== slot && this.isCanvasDirty) {
+      const result = await Swal.fire({
+        title: 'Firma sin guardar',
+        text: '¿Deseas guardar la firma actual antes de cambiar de sección?',
+        icon: 'warning',
+        showDenyButton: true,
+        showCancelButton: true,
+        confirmButtonText: 'Guardar',
+        denyButtonText: 'Descartar',
+        cancelButtonText: 'Cancelar'
+      });
+
+      if (result.isConfirmed) {
+        this.saveCurrentSignature(true);
+      } else if (!result.isDenied) {
+        // Si no seleccionó descartar (es decir, seleccionó cancelar o clickeó fuera)
+        return;
+      }
+    }
+
     this.activeSignatureSlot = slot;
     this.cdr.detectChanges();
     setTimeout(() => this.initCanvas(), 50);
@@ -869,16 +893,21 @@ export class Asignaciones implements OnInit, AfterViewInit {
     this.canvasCtx = canvas.getContext('2d');
     if (this.canvasCtx) {
       this.canvasCtx.strokeStyle = '#1a1a2e';
-      this.canvasCtx.lineWidth = 2;
+      this.canvasCtx.lineWidth = 1.0;
       this.canvasCtx.lineCap = 'round';
       this.canvasCtx.lineJoin = 'round';
       this.canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
       if (this.signatures[this.activeSignatureSlot]) {
         const sigImg = new Image();
         sigImg.src = this.signatures[this.activeSignatureSlot];
+        this.currentPreviewImage = this.signatures[this.activeSignatureSlot];
         sigImg.onload = () => {
           this.canvasCtx?.drawImage(sigImg, 0, 0);
+          this.isCanvasDirty = false;
         };
+      } else {
+        this.currentPreviewImage = null;
+        this.isCanvasDirty = false;
       }
     }
   }
@@ -886,6 +915,7 @@ export class Asignaciones implements OnInit, AfterViewInit {
   startDrawing(event: PointerEvent): void {
     if (!this.canvasCtx) return;
     this.isDrawing = true;
+    this.isCanvasDirty = true;
     const canvas = this.signatureCanvas.nativeElement;
     canvas.setPointerCapture(event.pointerId);
     const rect = canvas.getBoundingClientRect();
@@ -894,7 +924,9 @@ export class Asignaciones implements OnInit, AfterViewInit {
     this.canvasCtx.beginPath();
     this.canvasCtx.moveTo(x, y);
     if (event.pressure && event.pressure > 0) {
-      this.canvasCtx.lineWidth = Math.max(1, event.pressure * 4);
+      this.canvasCtx.lineWidth = Math.max(0.2, event.pressure * 2);
+    } else {
+      this.canvasCtx.lineWidth = 1.0;
     }
   }
 
@@ -905,27 +937,41 @@ export class Asignaciones implements OnInit, AfterViewInit {
     const x = (event.clientX - rect.left) * (canvas.width / rect.width);
     const y = (event.clientY - rect.top) * (canvas.height / rect.height);
     if (event.pressure && event.pressure > 0) {
-      this.canvasCtx.lineWidth = Math.max(1, event.pressure * 4);
+      this.canvasCtx.lineWidth = Math.max(0.2, event.pressure * 2);
+    } else {
+      this.canvasCtx.lineWidth = 1.0;
     }
     this.canvasCtx.lineTo(x, y);
     this.canvasCtx.stroke();
   }
 
   stopDrawing(): void {
+    if (!this.isDrawing) return;
     this.isDrawing = false;
+    this.updatePreview();
   }
 
   clearSignature(): void {
     if (!this.canvasCtx || !this.signatureCanvas) return;
     const canvas = this.signatureCanvas.nativeElement;
     this.canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+    this.isCanvasDirty = false;
+    this.updatePreview();
   }
 
-  saveCurrentSignature(): void {
+  updatePreview(): void {
+    if (!this.signatureCanvas) return;
+    this.currentPreviewImage = this.signatureCanvas.nativeElement.toDataURL('image/png');
+  }
+
+  saveCurrentSignature(silent: boolean = false): void {
     if (!this.signatureCanvas || !this.activeSignatureSlot) return;
     const canvas = this.signatureCanvas.nativeElement;
     this.signatures[this.activeSignatureSlot] = canvas.toDataURL('image/png');
-    Swal.fire({ icon: 'success', title: 'Firma guardada', text: `Firma de "${this.getSlotLabel(this.activeSignatureSlot)}" guardada.`, timer: 1500, showConfirmButton: false });
+    this.isCanvasDirty = false;
+    if (!silent) {
+      Swal.fire({ icon: 'success', title: 'Firma guardada', text: `Firma de "${this.getSlotLabel(this.activeSignatureSlot)}" guardada.`, timer: 1500, showConfirmButton: false });
+    }
     this.cdr.detectChanges();
   }
 
@@ -948,10 +994,16 @@ export class Asignaciones implements OnInit, AfterViewInit {
 
   generateSignedPDF(): void {
     if (!this.currentAsignacionForPDF) return;
+    
+    // Auto-guardado de la firma actual antes de generar el PDF
+    if (this.isCanvasDirty && this.activeSignatureSlot) {
+      this.saveCurrentSignature(true);
+    }
+    
     const asignacion = this.currentAsignacionForPDF;
     const sigs = { ...this.signatures };
-    this.closeSignatureModal();
+    //this.closeSignatureModal();
     this.generatePDF(asignacion, sigs);
   }
 }
-
+

@@ -149,34 +149,74 @@ td{
         }
     }
 
-    .canvas-container {
-        border: 2px dashed #cbd5e0;
+    .signature-canvas-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background-color: #f8fafc;
+        padding: 1.5rem 1rem;
         border-radius: 8px;
-        background-color: #fafafa;
-        position: relative;
         margin-bottom: 1.5rem;
-        overflow: hidden;
+        border: 1px solid #e2e8f0;
         
-        &.active-canvas {
-            border-color: #4299e1;
-            background-color: #ffffff;
-        }
-
-        canvas {
-            display: block;
+        label {
+            align-self: flex-start;
             width: 100%;
-            height: 250px;
-            cursor: crosshair;
+            max-width: 560px;
         }
 
-        .canvas-placeholder {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: #a0aec0;
-            pointer-events: none;
-            user-select: none;
+        .canvas-wrapper {
+            position: relative;
+            width: 500px;
+            max-width: 100%;
+
+            .signature-canvas {
+                border: 2px solid #cbd5e0;
+                border-radius: 4px;
+                background-color: #ffffff;
+                cursor: crosshair;
+                width: 100%;
+                display: block;
+                aspect-ratio: 500 / 200;
+                touch-action: none;
+                box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+
+                &:active {
+                    border-color: #4299e1;
+                }
+            }
+
+            .reference-line {
+                position: absolute;
+                top: 75%;
+                left: 10%;
+                right: 10%;
+                border-top: 2px dashed #3a3d41;
+                pointer-events: none;
+            }
+
+            .reference-text {
+                position: absolute;
+                top: 78%;
+                left: 0;
+                width: 100%;
+                text-align: center;
+                font-size: 0.75em;
+                color: #3a3d41;
+                font-weight: 500;
+                pointer-events: none;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+            }
+        }
+        
+        .canvas-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 16px;
+            width: 100%;
+            max-width: 560px;
+            justify-content: flex-end;
         }
     }
 
@@ -207,6 +247,78 @@ td{
             color: #2b6cb0;
 
             &:hover { background-color: #bee3f8; }
+        }
+    }
+
+    .signature-preview {
+        margin-top: 1.5rem;
+        padding-top: 1.5rem;
+        border-top: 1px dashed #e2e8f0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+
+        .preview-title {
+            font-size: 0.85rem;
+            color: #718096;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+
+        .pdf-mockup {
+            background: white;
+            padding: 1rem 1.5rem;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+            border: 1px solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 240px;
+
+            img {
+                width: 200px;
+                height: 80px;
+                object-fit: contain;
+                margin-bottom: -20px;
+                position: relative;
+                z-index: 10;
+            }
+            
+            .empty-placeholder {
+                width: 200px;
+                height: 80px;
+                margin-bottom: -20px;
+                position: relative;
+                z-index: 10;
+            }
+
+            .pdf-line {
+                width: 200px;
+                border-top: 1px solid #000;
+                margin-bottom: 4px;
+                position: relative;
+                z-index: 1;
+            }
+
+            .pdf-role {
+                font-family: 'Times New Roman', Times, serif;
+                font-size: 11px;
+                font-weight: bold;
+                color: #000;
+                text-align: center;
+                margin-bottom: 2px;
+            }
+
+            .pdf-name {
+                font-family: 'Times New Roman', Times, serif;
+                font-size: 10px;
+                color: #000;
+                text-align: center;
+            }
         }
     }
 

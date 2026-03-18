@@ -487,21 +487,43 @@
       <!-- Canvas Area -->
       @if(activeSignatureSlot) {
       <div class="signature-canvas-container">
-        <label style="font-weight: 500; margin-bottom: 6px; display: block;">Firmar: {{ getSlotLabel(activeSignatureSlot) }}</label>
-        <canvas #signatureCanvas
-          class="signature-canvas"
-          width="560" height="200"
-          (pointerdown)="startDrawing($event)"
-          (pointermove)="draw($event)"
-          (pointerup)="stopDrawing()"
-          (pointerleave)="stopDrawing()">
-        </canvas>
-        <div style="display: flex; gap: 8px; margin-top: 8px;">
+        <label style="font-weight: 500; margin-bottom: 10px; color: #4a5568;">
+          Área de Firma: <span style="color: #2b6cb0;">{{ getSlotLabel(activeSignatureSlot) }}</span>
+        </label>
+        <div class="canvas-wrapper">
+          <canvas #signatureCanvas
+            class="signature-canvas"
+            width="500" height="200"
+            (pointerdown)="startDrawing($event)"
+            (pointermove)="draw($event)"
+            (pointerup)="stopDrawing()"
+            (pointerleave)="stopDrawing()">
+          </canvas>
+          <div class="reference-line"></div>
+          <div class="reference-text">Firme aquí</div>
+        </div>
+        <div class="canvas-actions">
           <button type="button" class="btn-secondary" (click)="clearSignature()" style="font-size: 0.85em;">Limpiar</button>
           <button type="button" class="btn-primary" (click)="saveCurrentSignature()" style="font-size: 0.85em;">Guardar Firma</button>
           @if(signatures[activeSignatureSlot]) {
           <button type="button" style="font-size: 0.85em; background: #e53e3e; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer;" (click)="removeSignature()">Eliminar Firma</button>
           }
+        </div>
+
+        <div class="signature-preview">
+          <div class="preview-title">Vista previa en PDF</div>
+          <div class="pdf-mockup">
+            @if(currentPreviewImage) {
+              <img [src]="currentPreviewImage" alt="Firma" />
+            } @else {
+              <div class="empty-placeholder"></div>
+            }
+            <div class="pdf-line"></div>
+            <div class="pdf-role">{{ getSlotLabel(activeSignatureSlot).toUpperCase() }}</div>
+            @if(activeSignatureSlot === 'recibi' && currentAsignacionForPDF && getEmpleadoNombre(currentAsignacionForPDF)) {
+              <div class="pdf-name">{{ getEmpleadoNombre(currentAsignacionForPDF) }}</div>
+            }
+          </div>
         </div>
       </div>
       } @else {
